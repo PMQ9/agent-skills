@@ -72,6 +72,28 @@ Picking rules:
 | Skill | Path | Use when |
 |---|---|---|
 | secrets-management | [.claude/skills/engineering/security/secrets-management/SKILL.md](.claude/skills/engineering/security/secrets-management/SKILL.md) | Storing, fetching, rotating secrets — Vault, AWS Secrets Manager/SSM, GCP Secret Manager, Azure Key Vault, KMS, SOPS, Sealed Secrets, External Secrets Operator, IRSA/Workload Identity, mTLS. |
+| authn-authz | [.claude/skills/engineering/security/authn-authz/SKILL.md](.claude/skills/engineering/security/authn-authz/SKILL.md) | Authentication and authorization — login, SSO, SAML, OIDC, OAuth, JWT, sessions, cookies, MFA, API keys, role/permission checks, IDOR, tenancy isolation, admin gating. |
+| application-security | [.claude/skills/engineering/security/application-security/SKILL.md](.claude/skills/engineering/security/application-security/SKILL.md) | Web app security baseline — OWASP Top 10, injection (SQL/command/template), SSRF, CSRF, XSS, deserialization, CSP/headers, open redirect, file uploads, dependency/supply-chain risk. |
+| audit-logging | [.claude/skills/engineering/security/audit-logging/SKILL.md](.claude/skills/engineering/security/audit-logging/SKILL.md) | Audit logs for "who did what when" — auth events, authz decisions, admin actions, data access/exports, FERPA § 99.32 disclosure logs, tamper-evident retention, forensics. |
+| pii-handling | [.claude/skills/engineering/security/pii-handling/SKILL.md](.claude/skills/engineering/security/pii-handling/SKILL.md) | PII lifecycle — collection, storage, transit, derivation, sharing, deletion; quasi-identifiers, re-identification risk, anonymization, PII in logs/caches/LLM prompts, vendor sharing. |
+
+### Engineering / Compliance
+
+| Skill | Path | Use when |
+|---|---|---|
+| ferpa-compliance | [.claude/skills/engineering/compliance/ferpa-compliance/SKILL.md](.claude/skills/engineering/compliance/ferpa-compliance/SKILL.md) | FERPA rules for student data — education records, directory info, parent/guardian access, SIS/registrar data, rosters, grades, advising, vendor disclosures. |
+
+### Engineering / AI
+
+| Skill | Path | Use when |
+|---|---|---|
+| llm-application-engineering | [.claude/skills/engineering/ai/llm-application-engineering/SKILL.md](.claude/skills/engineering/ai/llm-application-engineering/SKILL.md) | Production LLM apps — model selection, structured outputs, streaming, prompt caching, retries, fallbacks, cost/latency control, observability, hardening prototypes for ship. |
+| agent-design | [.claude/skills/engineering/ai/agent-design/SKILL.md](.claude/skills/engineering/ai/agent-design/SKILL.md) | Designing LLM agents — agent vs workflow, tool design, agent loop, context management, runaway/cost control, planner-executor, "tool use," "function calling loop," autonomous task execution. |
+| rag-architecture | [.claude/skills/engineering/ai/rag-architecture/SKILL.md](.claude/skills/engineering/ai/rag-architecture/SKILL.md) | Retrieval-augmented generation — chunking, embeddings, hybrid search, reranking, contextual retrieval, query rewriting, citations, "chatbot over our docs," RAG that degrades in prod. |
+| llm-evaluation | [.claude/skills/engineering/ai/llm-evaluation/SKILL.md](.claude/skills/engineering/ai/llm-evaluation/SKILL.md) | LLM evals — golden datasets, rubrics, assertions, LLM-as-judge, calibration, regression tests, "is the new prompt better?", offline/online evals, A/B tests for LLM features. |
+| mcp-server-design | [.claude/skills/engineering/ai/mcp-server-design/SKILL.md](.claude/skills/engineering/ai/mcp-server-design/SKILL.md) | Model Context Protocol servers — tools vs resources vs prompts, schema design, error handling, auth, transports, pagination, "expose this to Claude," debugging tool-calling. |
+| prompt-injection-defense | [.claude/skills/engineering/ai/prompt-injection-defense/SKILL.md](.claude/skills/engineering/ai/prompt-injection-defense/SKILL.md) | LLM security — direct/indirect prompt injection, jailbreaks, untrusted content, capability containment, output validation, exfiltration vectors (URLs, markdown, file writes), agent threat models. |
+| human-in-the-loop-workflows | [.claude/skills/engineering/ai/human-in-the-loop-workflows/SKILL.md](.claude/skills/engineering/ai/human-in-the-loop-workflows/SKILL.md) | HITL design — approval gates, review queues, confidence thresholds, escalation UX, reviewer tooling, feedback loops to prompts/training, moderation/QA at scale, active learning. |
 
 ## Adding a new skill
 
