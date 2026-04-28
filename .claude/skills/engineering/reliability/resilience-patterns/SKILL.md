@@ -53,13 +53,25 @@ def fetch_inventory(sku: str) -> Inventory:
 ```
 
 ```go
-// Sketch in Go with a small loop
+// Sketch in Go (1.22+: math/rand/v2 is auto-seeded and concurrent-safe).
+// Full jitter: sleep ~ U(0, min(cap, base * 2^attempt)). The min(cap, …) is
+// load-bearing — `base * (1 << attempt)` overflows int64 around attempt 63
+// and produces hour-long sleeps well before that.
+import "math/rand/v2"
+
+const (
+    base = 100 * time.Millisecond
+    cap_ = 30 * time.Second
+)
+
 for attempt := 0; attempt < maxAttempts; attempt++ {
     res, err := callOnce(ctx)
     if err == nil { return res, nil }
     if !isRetryable(err) { return nil, err }
     if ctx.Err() != nil { return nil, ctx.Err() } // deadline exceeded
-    backoff := time.Duration(rand.Int63n(int64(base * (1 << attempt))))
+    exp := base << min(attempt, 20) // shift cap defends against overflow
+    if exp > cap_ { exp = cap_ }
+    backoff := time.Duration(rand.Int64N(int64(exp)))
     select {
     case <-time.After(backoff):
     case <-ctx.Done(): return nil, ctx.Err()

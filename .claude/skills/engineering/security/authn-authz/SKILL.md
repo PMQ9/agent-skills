@@ -1,6 +1,6 @@
 ---
 name: authn-authz
-description: Implement and review authentication (who you are) and authorization (what you can do) for any feature touching protected data, user accounts, sessions, tokens, API endpoints, or admin functionality. Use whenever the work involves login, logout, SSO, SAML, OIDC, OAuth, JWT, sessions, cookies, password handling, MFA, API keys, service accounts, role checks, permission checks, "can user X do Y," tenancy isolation, impersonation, or anything that gates access to data. Trigger even when the request doesn't say "auth" — phrases like "add an admin page," "let advisors edit this," "expose this endpoint," "service-to-service call," "reset password," or "remember me" all need this skill. Missing or broken authz is the single most common cause of FERPA / data breaches in student systems; treat every endpoint as guilty until proven authorized.
+description: Implement and review authentication (who you are) and authorization (what you can do) for any feature touching protected data, user accounts, sessions, tokens, API endpoints, or admin functionality. Use whenever the work involves login, logout, SSO, SAML, OIDC, OAuth, JWT, passkeys, WebAuthn, sessions, cookies, password handling, MFA, API keys, service accounts, role checks, permission checks, "can user X do Y," tenancy isolation, impersonation, or anything that gates access to data. Trigger even when the request doesn't say "auth" — phrases like "add an admin page," "let advisors edit this," "expose this endpoint," "service-to-service call," "reset password," or "remember me" all need this skill. Missing or broken authz is the single most common cause of FERPA / data breaches in student systems; treat every endpoint as guilty until proven authorized.
 ---
 
 # Authentication and Authorization
@@ -16,18 +16,32 @@ You can have great authn and zero authz and still leak the entire database. Most
 
 ### Use the institutional SSO. Do not roll your own.
 
-For any Vanderbilt-facing application, identity comes from the institutional identity provider (IdP) — typically a SAML or OIDC integration with the central SSO. Your application should be a Service Provider / Relying Party, not an identity store.
+For any institution-facing application, identity comes from the institutional identity provider (IdP) — typically a SAML or OIDC integration with the central SSO. Your application should be a Service Provider / Relying Party, not an identity store.
 
 Why: the IdP enforces password policy, MFA, account lifecycle (offboarding when someone leaves), suspicious-activity detection, and shared compromise response. Reimplementing any of that in your app means re-implementing all of it, badly.
 
-Practical guidance:
+Practical guidance — default to **OAuth 2.1** (consolidates OAuth 2.0 + best-current-practice; PKCE required for *all* clients including confidential; implicit and ROPC removed):
 
 - **OIDC over SAML when offered.** OIDC is simpler, JSON, better library support. Use SAML if that's what's offered.
-- **Use a maintained library.** OIDC: `openid-client` (Node), `authlib` (Python), Spring Security (Java). SAML: `python3-saml`, `passport-saml`. Don't parse SAML XML by hand — XML signature wrapping attacks are real and well-documented.
+- **Use a maintained library.** OIDC: `openid-client` (Node), `authlib` (Python), Spring Security (Java). SAML: `python3-saml`, `@node-saml/passport-saml` (the maintained fork — original `passport-saml` has known issues). Don't parse SAML XML by hand — XML signature wrapping attacks are real and well-documented.
 - **Verify the ID token** — signature, issuer, audience, expiration, nonce. Most libraries do this; don't disable checks.
-- **PKCE for public clients.** SPA or mobile? Use Authorization Code with PKCE (`code_challenge_method=S256`). Never use Implicit flow.
+- **PKCE for *all* clients** — Authorization Code with PKCE (`code_challenge_method=S256`) is mandatory in OAuth 2.1, including confidential clients. Implicit and ROPC are removed.
+- **Consider PAR (RFC 9126)** — Pushed Authorization Requests — for sensitive flows; the client posts auth params to the IdP server-side and gets a `request_uri` back, removing them from the browser URL.
+- **Consider DPoP (RFC 9449)** — sender-constrained tokens — for high-value tokens; binds the token to a client-held key so a stolen token can't be replayed.
 - **Use the `state` parameter** to prevent CSRF on the redirect, and the `nonce` to bind the ID token to the session.
 - **Validate the redirect URI on the server.** Allowlist exact match; no wildcards, no path-prefix matches that allow `/callback/../evil`.
+
+### Passkeys / WebAuthn
+
+For new systems with local accounts, passkeys (WebAuthn) are the recommended primary factor in 2026:
+
+- **Phishing-resistant by construction** — the credential is bound to the origin; users cannot be tricked into authenticating to a lookalike domain.
+- **No shared secret to leak** — the server stores only a public key. Database compromise doesn't leak credentials.
+- **Library support is mature** — `@simplewebauthn/server` (Node), `webauthn` (Python via `py_webauthn`), Spring Security passkey support. Use a library; don't implement the CBOR/COSE parsing by hand.
+- **Pair with a fallback.** Passkeys + email-link + step-up MFA is a reasonable trio. Keep TOTP available as a second factor for users who haven't moved to passkeys.
+- **Discoverable credentials (resident keys)** enable username-less login on supported platforms — the user picks the credential rather than typing an email first.
+
+If your IdP supports passkeys, prefer doing it there rather than in each application.
 
 ### Session management
 
@@ -39,8 +53,10 @@ Once authn succeeds, you create a session. The session is the durable artifact t
   - `Secure` — HTTPS only.
   - `HttpOnly` — not readable by JS. Defeats most XSS-based session theft.
   - `SameSite=Lax` for normal apps; `Strict` if you don't have third-party flows; `None` only with `Secure` and a real reason.
+  - **`__Host-` prefix** for session cookies — guarantees `Secure`, `Path=/`, no `Domain` attribute, and same-origin. Use it whenever possible; modern browsers enforce the constraints, eliminating an entire class of cookie-scoping bugs.
   - `Path=/` typical; restrict if appropriate.
-  - `Domain` — set explicitly; don't leak to subdomains you don't own.
+  - `Domain` — set explicitly when you can't use `__Host-`; don't leak to subdomains you don't own.
+  - Consider **CHIPS / partitioned cookies** (`Partitioned` attribute) for embedded contexts where cross-site cookies are unavoidable.
 - **Session ID entropy** — use the framework's session generator (≥128 bits of entropy from a CSPRNG). Don't roll your own.
 - **Rotate session ID on privilege change** — login, MFA step-up, role assumption. Prevents session fixation.
 - **Idle timeout and absolute timeout.** Idle 15–30 min for sensitive apps; absolute 8–12 hours typical. Educational record systems should be on the shorter end.
@@ -50,6 +66,7 @@ Once authn succeeds, you create a session. The session is the durable artifact t
 
 - **`alg: none` must be rejected.** Configure the verifier to require a specific algorithm, not "whatever the token says."
 - **Algorithm confusion attacks** — if your verifier accepts both RS256 and HS256, an attacker can take your public key and use it as the HMAC secret. Pin the algorithm.
+- **Prefer EdDSA or ES256** for new systems. RS256 is fine if your ecosystem mandates it. HS256 only when you control both sides and have a strong key rotation story. SHA-1 is dead; never accept it.
 - **Don't put sensitive data in the JWT body.** It's base64, not encryption. No grades, no SSNs, no anything you wouldn't want logged.
 - **Validate `exp`, `nbf`, `iss`, `aud` every time.**
 - **Short TTLs.** Access tokens 5–15 minutes. Long-lived bearer tokens are landmines.
@@ -57,14 +74,17 @@ Once authn succeeds, you create a session. The session is the durable artifact t
 
 ### Password handling (only if you have local accounts)
 
-You probably shouldn't have local accounts. If you do:
+You probably shouldn't have local accounts — passkeys + IdP cover most needs. If you do:
 
-- `argon2id` (preferred) or `bcrypt` with cost ≥ 12. Never plain SHA / MD5 / unsalted anything.
+- **Argon2id** is the only password hash to recommend for new systems. Use library defaults (`argon2-cffi`, `node-argon2`, `org.bouncycastle.crypto.generators.Argon2BytesGenerator`); do not invent parameters.
+- **Bcrypt** is acceptable only when you're maintaining an existing hash store and rehashing-on-login. Cost ≥ 12 then. Don't pick bcrypt for greenfield.
+- **PBKDF2** only when constrained by FIPS or hardware tokens.
+- Never plain SHA / MD5 / unsalted anything; SHA-1 is dead.
 - Minimum length 12+. NIST SP 800-63B: length matters more than complexity rules.
 - Check against breach corpora (HIBP API has a k-anonymity endpoint).
 - Rate-limit and lock out on repeated failures, but with care to avoid enabling user enumeration or DoS via lockout.
 - Password reset flows: single-use, time-bound (≤30 min) tokens, sent only to the verified email; rotate session on reset; notify the user out-of-band.
-- MFA. Even if the IdP enforces it for primary login, sensitive actions (admin, data export) deserve step-up.
+- MFA. Even if the IdP enforces it for primary login, sensitive actions (admin, data export) deserve step-up. Prefer passkeys / FIDO2 over TOTP over SMS.
 
 ### MFA / step-up authentication
 

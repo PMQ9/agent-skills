@@ -72,7 +72,7 @@ Don't invent codes. Don't return 200 with `"success": false` — that's the card
 
 ## Error response shape
 
-Standardize errors. RFC 7807 (`application/problem+json`) is the right default:
+Standardize errors. **RFC 9457** (`application/problem+json`, obsoletes RFC 7807) is the right default:
 
 ```json
 {
@@ -96,11 +96,12 @@ Pick one strategy and stick to it:
 
 - **URL path versioning** (`/v1/orders`) — simplest, most visible, most cache-friendly, most common. Default to this.
 - **Header versioning** (`Accept: application/vnd.example.v2+json`) — cleaner URLs but invisible in logs and harder for casual clients.
+- **Date-based versioning** (Stripe's model: `Stripe-Version: 2024-09-30`) — every breaking change pinned to a release date; clients opt in by setting their version header. Strong choice for APIs with many small breaking changes over time.
 - **Query param versioning** — avoid; breaks caching and convention.
 
 Prefer to **not version at all** by being additive. Adding optional fields, new endpoints, new enum values *should* be safe — but only if you've told clients up front that you'll do this. Bake "tolerant reader" expectations into your docs from day one.
 
-A new major version should be the last resort. When you do bump, run both versions in parallel and publish a deprecation timeline measured in months or years, not weeks.
+A new major version should be the last resort. When you do bump, run both versions in parallel and publish a deprecation timeline measured in months or years, not weeks. Use the `Deprecation` header (RFC 9745) and `Sunset` header (RFC 8594) on every response from a deprecated version so clients can detect it programmatically.
 
 ## What's a breaking change?
 
@@ -136,7 +137,7 @@ Always return pagination metadata in a predictable place. Two common shapes:
 }
 ```
 
-Or use `Link` headers (RFC 5988) — interoperable but harder for non-browser clients to consume.
+Or use `Link` headers (RFC 8288, obsoletes RFC 5988) — interoperable but harder for non-browser clients to consume.
 
 Cap page size on the server. If the client asks for `limit=10000`, return 100 and document the cap.
 
@@ -156,34 +157,34 @@ The pattern: client generates a key (UUID is fine), sends it in `Idempotency-Key
 - Same request hash → return the stored response.
 - Different request hash → 422 with `code: "idempotency_key_reused"`.
 
-Stripe's implementation is the canonical reference; copy it. This is non-negotiable for payments, transfers, message sends, anything externally observable.
+Stripe's implementation is the canonical reference; copy it. The IETF `Idempotency-Key` HTTP header draft (`draft-ietf-httpapi-idempotency-key-header`) is the standardization vehicle if you want a published spec to point at. This is non-negotiable for payments, transfers, message sends, anything externally observable.
 
 ## Authentication and authorization
 
-For server-to-server: **OAuth 2.0 client credentials** or **mTLS**. Static API keys are acceptable for low-stakes, but rotate them and scope them.
+Default to **OAuth 2.1** (consolidates OAuth 2.0 + best-current-practice; PKCE required for *all* clients including confidential; implicit flow and ROPC removed). See `authn-authz` for the full token, session, and JWT story; this section is the API-contract slice.
 
-For user-acting clients: **OAuth 2.0 authorization code with PKCE**. Don't invent your own. Don't use the implicit flow.
+For server-to-server: **OAuth 2.1 client credentials** or **mTLS**. Static API keys are acceptable for low-stakes integrations — rotate them and scope them.
 
-For first-party browser apps with a session: **HttpOnly, Secure, SameSite cookies**, with CSRF protection (SameSite=Lax usually suffices, but verify against your flows).
+For user-acting clients: **OAuth 2.1 authorization code with PKCE**. Don't invent your own. Consider **PAR (RFC 9126)** for sensitive flows and **DPoP (RFC 9449)** for sender-constrained tokens.
 
-JWTs are not magical. They're a way to pass signed claims; they aren't sessions. Keep their lifetimes short (minutes) and pair with refresh tokens. Validate signature, `iss`, `aud`, `exp`, `nbf` on every request. Don't put PII in them — they're often logged.
+For first-party browser apps with a session: **HttpOnly, Secure, SameSite cookies** with the `__Host-` prefix, plus CSRF protection (SameSite=Lax handles top-level POST; double-submit-token still recommended for non-cookie auth on cross-origin requests).
+
+JWTs are not magical. They're a way to pass signed claims; they aren't sessions. Keep lifetimes short (minutes) and pair with refresh tokens. Validate signature, `iss`, `aud`, `exp`, `nbf`, and reject `alg: none` on every request. Prefer EdDSA or ES256 over RS256 for new systems. Don't put PII in them — they're often logged.
 
 Authorization is separate from authentication. Don't conflate "they have a token" with "they can do this." Centralize policy (e.g., an authorization service or library), keep checks at the edge of every endpoint, and prefer attribute-based checks over hardcoded role checks.
 
 ## Rate limiting
 
-Return `429 Too Many Requests` with these headers:
+Return `429 Too Many Requests` with a `Retry-After` header and the structured-fields `RateLimit` header (the IETF `draft-ietf-httpapi-ratelimit-headers` draft converged on RFC 9651 structured fields):
 
 ```
 Retry-After: 30
-RateLimit-Limit: 100
-RateLimit-Remaining: 0
-RateLimit-Reset: 30
+RateLimit: "default"; limit=100; remaining=0; reset=30
 ```
 
-(IETF `RateLimit-*` is the emerging standard; older `X-RateLimit-*` is widely deployed and fine.)
+The flat `RateLimit-Limit` / `RateLimit-Remaining` / `RateLimit-Reset` shape is the *older* draft and the legacy `X-RateLimit-*` family is still widely deployed; either is acceptable for compatibility, but new APIs should emit the structured-fields form.
 
-Limit per credential, not per IP — IPs share. Tiered limits (per-second burst, per-minute sustained) are friendlier than a single hard wall. Document the limits.
+Limit per credential, not per IP — IPs share. Tiered limits (per-second burst, per-minute sustained) are friendlier than a single hard wall. Document the limits. See `resilience-patterns` for the underlying mechanics (token bucket vs leaky bucket, load shedding).
 
 ## Long-running operations
 

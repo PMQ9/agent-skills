@@ -103,7 +103,7 @@ WITH (m = 16, ef_construction = 64);
 
 - **Build time:** Slower than IVFFlat (proportional to vector count × `m` × `ef_construction`).
 - **Query time:** Excellent recall/latency trade-off; the standard for production.
-- **Memory:** Higher than IVFFlat. For 10M × 1536d vectors, plan ~30 GB+ for the index in `shared_buffers` to be hot.
+- **Memory:** Higher than IVFFlat. For 10M × 1536d vectors with `m=16`, plan **~65 GB** for the HNSW index (raw vectors ≈ 6 GB/M rows + graph overhead) — see "Index memory" below for the formula. The index needs to be hot in `shared_buffers` or OS cache.
 - **Inserts:** Supported online; new rows are findable immediately. Cost scales with `m` and `ef_construction`.
 - **No training required.** You can build the index on an empty table and rows index incrementally.
 

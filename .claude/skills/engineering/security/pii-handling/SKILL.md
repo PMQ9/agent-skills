@@ -5,9 +5,9 @@ description: Handle personally identifiable information (PII) correctly througho
 
 # PII Handling
 
-PII = any data that can identify a person, alone or in combination with other data. In a Vanderbilt student system, the surface includes:
+PII = any data that can identify a person, alone or in combination with other data. In a higher-education student system, the surface includes:
 
-- **Direct identifiers**: name, student ID (VUnetID, etc.), SSN, government ID, biometrics, photo, voice
+- **Direct identifiers**: name, student ID (institutional username/netID, etc.), SSN, government ID, biometrics, photo, voice
 - **Quasi-identifiers**: DOB, ZIP, gender, ethnicity, major, cohort year, country of origin — combine 3 of these and you can usually pick out a single student
 - **Contact**: address, phone, email (institutional and personal), emergency contacts
 - **Family**: parent/guardian names, contact info, financial info, dependent status
@@ -15,7 +15,7 @@ PII = any data that can identify a person, alone or in combination with other da
 - **Financial**: aid awards, balances, bank info, payment cards
 - **Health**: disability accommodations, immunization records (often FERPA, sometimes HIPAA — escalate if HIPAA-scope)
 
-The legal regime depends on the data: FERPA for education records (most of the above), GLBA for financial data tied to aid, HIPAA for true medical records, state laws (Tennessee includes breach notification thresholds), and the institution's own data-classification policy. Don't try to memorize the matrix — escalate to the privacy office for novel data flows.
+The legal regime depends on the data: FERPA for education records (most of the above), GLBA for financial data tied to aid, HIPAA for true medical records, state breach-notification laws (the patchwork now spans CO/VA/CT/UT/TX/FL/OR/IA/DE/NJ/IN/MT and others — confirm against the institution's home state and any state where data subjects reside), PCI-DSS 4.0 for payment cards (effective March 2025), and the institution's own data-classification policy. Don't try to memorize the matrix — escalate to the privacy office for novel data flows.
 
 This skill covers the engineering. Pair with `ferpa-compliance` for the legal rules and `application-security` for transport and injection concerns.
 

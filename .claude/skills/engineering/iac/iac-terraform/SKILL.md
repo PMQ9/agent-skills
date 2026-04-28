@@ -247,11 +247,11 @@ Pin everything:
 
 ```hcl
 terraform {
-  required_version = "~> 1.10"
+  required_version = "~> 1.10"  # 1.10+ for `ephemeral` values, native S3 state locking
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.70"
+      version = "~> 6.0"  # AWS provider v6 since late 2025; v5 is in maintenance
     }
   }
 }

@@ -17,13 +17,21 @@ MCP servers expose three kinds of things, and getting the choice right matters:
 
 **Prompts.** Templates the user (not the model) selects, which produce a starting message for the LLM. Useful for repeated workflows, less useful for autonomous agents.
 
-The default mistake is to make everything a tool. Two clarifying questions:
+The 2025-06 and 2025-11 spec revisions added three more primitives worth knowing:
+
+- **Sampling.** The server can request a model completion *from the client*, letting servers compose their own LLM calls without holding API keys. Useful for servers that need an embedded reasoning step.
+- **Roots.** Workspace boundaries the client advertises to the server (e.g., "you may operate on `/repo/foo`"). Servers should respect roots when resolving paths, and reject operations outside them.
+- **Elicitation.** The server can ask the user a structured question mid-flight (e.g., "which branch?") and receive a typed response. The closest analog to "model asks user" without the model itself driving it.
+
+The default mistake is to make everything a tool. Clarifying questions:
 
 - "Is this idempotent and side-effect-free, and is the model going to read it as data?" → Resource.
 - "Does this take an action, return a computed result, or have side effects?" → Tool.
 - "Is this a user-triggered workflow shortcut?" → Prompt.
+- "Does my server need its own LLM call?" → Sampling.
+- "Do I need a workspace boundary or to ask the user a typed question?" → Roots / Elicitation.
 
-When in doubt, prefer tools — they are the most universally supported primitive across MCP clients, and many clients today don't implement resources or prompts as fully. But if your "tool" is `get_documentation_page(slug)` and is purely a read, consider a resource. The model treats data fetching and action invocation differently in its planning; matching its expectations improves behavior.
+When in doubt, prefer tools — they are the most universally supported primitive across MCP clients. As of 2026 the major clients (Claude Desktop, Cursor, VS Code, Cline) implement tools, resources, and prompts; sampling/roots/elicitation are still patchy. If your "tool" is `get_documentation_page(slug)` and is purely a read, consider a resource. The model treats data fetching and action invocation differently in its planning; matching its expectations improves behavior.
 
 ## Tool design
 
@@ -156,7 +164,7 @@ MCP servers are increasingly accessed by hosted LLM clients on behalf of users. 
 
 For local servers (stdio transport): inherit the user's credentials from the environment. The user runs the host; the host runs the server; the server has whatever access the user does. Simplest but only works locally.
 
-For remote servers (HTTP/SSE transport): use OAuth. MCP supports OAuth 2.1 with discovery. Each user authenticates once; the host stores tokens; the server validates them per request. This is the right pattern for any multi-user service.
+For remote servers (Streamable HTTP transport): use OAuth 2.1. The 2025-06+ MCP spec standardizes auth on OAuth 2.0 Protected Resource Metadata (RFC 9728) for discovery and Dynamic Client Registration (RFC 7591) for client onboarding. Each user authenticates once; the host stores tokens; the server validates them per request. This is the right pattern for any multi-user service.
 
 Avoid: API keys passed as tool parameters, hardcoded credentials in server config, "we'll add auth later." Adding auth later means redesigning the surface, because some tools become per-user that weren't.
 
@@ -164,10 +172,12 @@ For internal/single-tenant servers: a static bearer token from a config secret i
 
 ## Transport
 
-MCP supports stdio (process-based) and HTTP-based transports. Choose based on deployment:
+MCP defines two current transports (per the 2025-06 / 2025-11 spec revisions). Choose based on deployment:
 
 - **stdio:** local server, host launches the process, simplest possible deployment. The right choice for tools that need access to the user's local machine — filesystem, local databases, user's editor state.
-- **HTTP/SSE:** remote server, hosted, multi-user. The right choice for SaaS-style integrations where the server is centrally operated.
+- **Streamable HTTP:** remote server, hosted, multi-user. A single HTTP endpoint that the client POSTs JSON-RPC to and optionally upgrades to a server-sent stream for long-running responses. The right choice for SaaS-style integrations where the server is centrally operated.
+
+The older HTTP+SSE transport (separate `/sse` and `/messages` endpoints) was deprecated in the 2025-03 spec revision and replaced by Streamable HTTP. Build new servers on Streamable HTTP; keep HTTP+SSE only for backward compatibility with old clients, with a clear sunset.
 
 Don't expose a stdio server over HTTP without a proper auth and isolation layer. The stdio model assumes the user owns the process; HTTP assumes adversarial requests. The threat models are different.
 

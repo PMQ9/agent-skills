@@ -99,13 +99,21 @@ A good rule: if you wouldn't put it on a billboard, don't put it in a log line. 
 **Redact at the source.** Build a redaction layer in your logging library so sensitive fields are stripped before they hit any sink. Don't rely on downstream filtering — once it's in Datadog, the "delete" doesn't always actually delete.
 
 ```python
-# Redaction map applied by the logger
+# Redaction applied by the logger — recursive so nested PII does not leak.
 REDACT_FIELDS = {"password", "ssn", "dob", "transcript", "grade", "authorization", "cookie", "api_key"}
 
+def _scrub(value):
+    if isinstance(value, dict):
+        return {k: ("[REDACTED]" if k.lower() in REDACT_FIELDS else _scrub(v)) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_scrub(v) for v in value]
+    return value
+
 def safe_log(level, event, **kwargs):
-    cleaned = {k: ("[REDACTED]" if k.lower() in REDACT_FIELDS else v) for k, v in kwargs.items()}
-    logger.log(level, event, extra=cleaned)
+    logger.log(level, event, extra=_scrub(kwargs))
 ```
+
+A top-level-only scrubber leaks anything nested (e.g. `{"user": {"ssn": "..."}}`); the recursive form above matches the scrubber in `pii-handling`.
 
 **Structured, not stringified.** JSON or a structured logging framework. Free-form `f"User {user.email} did {action} on {resource}"` makes redaction impossible and parsing fragile.
 

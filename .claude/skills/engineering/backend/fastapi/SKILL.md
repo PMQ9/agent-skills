@@ -364,18 +364,22 @@ For most APIs: **OAuth2 Password (Bearer)** with JWTs, or session cookies for br
 ```python
 # app/core/security.py
 from datetime import datetime, timezone, timedelta
-import jwt
-from passlib.context import CryptContext
+import jwt  # PyJWT — do NOT use python-jose (slow maintenance, prior CVEs)
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 
 from app.config import get_settings
 
-_pwd = CryptContext(schemes=["argon2"], deprecated="auto")  # argon2 > bcrypt for new apps
+_hasher = PasswordHasher()  # argon2-cffi defaults follow OWASP guidance
 
 def hash_password(plain: str) -> str:
-    return _pwd.hash(plain)
+    return _hasher.hash(plain)
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return _pwd.verify(plain, hashed)
+    try:
+        return _hasher.verify(hashed, plain)
+    except VerifyMismatchError:
+        return False
 
 def create_access_token(subject: str) -> str:
     s = get_settings()
@@ -393,7 +397,8 @@ def decode_token(token: str) -> dict:
 
 Notes:
 
-- **Argon2id** is the modern password hash. Bcrypt is fine; argon2 is better for new builds.
+- **Argon2id is the only password hash to recommend for new systems.** This snippet uses `argon2-cffi` directly. Avoid `passlib` — unmaintained since Oct 2020. `pwdlib` is a modern wrapper if you need multi-scheme migration support.
+- **PyJWT** is the JWT library. Do not pick `python-jose` (irregular maintenance, prior CVEs).
 - **JWTs are not session tokens.** They cannot be revoked without an additional store. For browser apps with logout, prefer server-side sessions (Redis-backed, opaque token, lookup on each request) over JWTs. JWTs shine for inter-service auth.
 - **Refresh tokens** for long-lived auth: short-lived access JWT + long-lived refresh token (opaque, server-stored, revocable).
 - For external auth, use Authlib or a managed provider (Auth0, Clerk, Supabase Auth, WorkOS). Don't implement OAuth flows by hand.

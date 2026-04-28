@@ -1,9 +1,9 @@
 ---
-name: system-architect
+name: system-architecture
 description: Architectural reasoning, decision-making, and system design for backend services. Use whenever the user is designing a new system, evaluating architectural patterns (monolith vs microservices, layered vs hexagonal, sync vs async), making technology choices, writing ADRs, debugging architectural smells, or asking "how should I structure this." Triggers on phrases like "design," "architecture," "structure," "should I use," "trade-offs," "scale," and any greenfield system planning.
 ---
 
-# System Architect
+# System Architecture
 
 Architectural decisions are expensive to reverse. The job of this skill is to slow down enough to choose deliberately, write the choice down, and avoid the common failure modes — premature distribution, anemic domain models, leaky abstractions, and big-bang rewrites.
 
@@ -136,10 +136,10 @@ When splitting into modules or services, the boundary should follow:
 
 Quick estimates that catch most bad decisions:
 
-- A modern Postgres on decent hardware handles **5K–20K simple queries/sec** comfortably. If your projected load is below that, you don't need sharding.
+- A modern Postgres (17/18) on NVMe + many cores handles **50K–100K+ simple read QPS** and tens of thousands of writes per second. If your projected load is below that, you don't need sharding. Treat 5K–20K QPS as the conservative floor, not the ceiling.
 - A single backend instance handles **a few thousand concurrent connections** with async I/O (FastAPI, Node, Go) or **hundreds** with thread-per-request (sync Python/Ruby).
-- A Kafka partition processes **~10K msg/sec** comfortably. Plan partitions for both throughput and parallelism of consumers.
-- Fan-out kills tail latency: if a request makes N independent calls each with p99 latency X, the chance *all* finish under X is `0.99^N` — by N≈69 you're at 50/50, so the request's effective p99 is well past X. Cut N, hedge requests, or relax the percentile.
+- A Kafka partition (4.x with KRaft, zstd compression, small messages) handles **50K+ msg/sec** comfortably; the older "10K/partition" rule reflects mid-2010s hardware. Plan partitions for both throughput and consumer parallelism, not just throughput.
+- Fan-out kills tail latency: with N independent calls each at p99 X, the *aggregate* p99 is roughly the call's `(1 − 0.01/N)`-quantile, not X. By N=100 the effective p99 is closer to the call's p99.99 than its p99. Cut N, hedge requests, or relax the percentile.
 - **Network call ≈ 1ms in-DC, 10–100ms cross-region.** Memory access ≈ 100ns. Disk read ≈ 0.1–10ms. Keep the orders of magnitude in your head.
 
 ## Communicating architecture

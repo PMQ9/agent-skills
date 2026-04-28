@@ -1,13 +1,13 @@
 ---
 name: ferpa-compliance
-description: Apply FERPA (Family Educational Rights and Privacy Act) rules to any code, data model, query, API, report, or feature that touches Vanderbilt student data. Use whenever the work involves students, applicants, alumni, enrollment, grades, transcripts, advising, financial aid, disciplinary records, parents/guardians, directory info, or anything pulled from the SIS, registrar, or any system of record about a person who is or was enrolled. Trigger even when the request doesn't say "FERPA" — phrases like "show student emails," "export the roster," "send a list to the vendor," "build a dashboard of grades," "let parents see X," or "join this with admissions data" all need this skill. The registrar will block any system that mishandles this; getting it right is non-optional.
+description: Apply FERPA (Family Educational Rights and Privacy Act) rules to any code, data model, query, API, report, or feature that touches student data at any institution receiving federal funding. Use whenever the work involves students, applicants, alumni, enrollment, grades, transcripts, advising, financial aid, disciplinary records, parents/guardians, directory info, or anything pulled from the SIS, registrar, or any system of record about a person who is or was enrolled. Trigger even when the request doesn't say "FERPA" — phrases like "show student emails," "export the roster," "send a list to the vendor," "build a dashboard of grades," "let parents see X," or "join this with admissions data" all need this skill. The registrar will block any system that mishandles this; getting it right is non-optional.
 ---
 
 # FERPA Compliance
 
-FERPA is the federal law (20 U.S.C. § 1232g) governing student education records at any institution receiving federal funding. Vanderbilt is bound by it. Get this wrong and the registrar's office will (rightfully) refuse to onboard the system, regardless of how good the rest of the engineering is.
+FERPA is the federal law (20 U.S.C. § 1232g; implementing regulations at 34 CFR Part 99) governing student education records at any institution receiving federal funding. Get this wrong and the registrar's office will (rightfully) refuse to onboard the system, regardless of how good the rest of the engineering is.
 
-This skill covers the rules you need to apply *while writing code*. It is not legal advice. When in doubt, escalate to the Vanderbilt registrar / Office of the University Registrar / privacy office — don't guess.
+This skill covers the rules you need to apply *while writing code*. It is not legal advice. When in doubt, escalate to the institution's Office of the University Registrar / privacy office — don't guess. The U.S. Department of Education's Privacy Technical Assistance Center (PTAC, studentprivacy.ed.gov) is also a useful authoritative reference.
 
 ## The mental model
 
@@ -39,7 +39,7 @@ Format does not matter. Paper, database row, S3 object, log line, Slack message 
 
 ## Directory information
 
-Vanderbilt's published directory information categories are the authoritative list — get the current list from the registrar; do not hardcode assumptions. Typical categories at most institutions include name, address, phone, university email, dates of attendance, enrollment status, major, degrees and awards, participation in officially recognized activities, height/weight of athletes, and most-recent previous institution attended.
+The institution's published directory information categories are the authoritative list — get the current list from the registrar; do not hardcode assumptions. Typical categories at most institutions include name, address, phone, university email, dates of attendance, enrollment status, major, degrees and awards, participation in officially recognized activities, height/weight of athletes, and most-recent previous institution attended.
 
 **The opt-out is the trap.** Any student can request a "FERPA block" / "directory hold" / "non-disclosure flag." Once flagged, *none* of their directory information may be released — not even confirmation that they are or were a student. Your code must:
 
@@ -132,9 +132,9 @@ You are not the registrar. Some calls are policy decisions, not engineering deci
 
 The registrar would rather answer a question than clean up a violation. So would you.
 
-## Vanderbilt-specific items to pin down (fill in with the registrar)
+## Institution-specific items to pin down (fill in with the registrar)
 
-These are institution-specific and your code should read them from configuration / a policy document, not hardcode. Confirm with Vanderbilt's Office of the University Registrar:
+These are institution-specific and your code should read them from configuration / a policy document, not hardcode. Confirm with the institution's Office of the University Registrar:
 
 - The current published list of directory information categories.
 - The exact FERPA-block flag in the SIS and how to read it.

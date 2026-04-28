@@ -172,8 +172,28 @@ These show up constantly. Recognize them by name and refuse them:
 ## A reference structure for an LLM call
 
 ```python
+# Illustrative — `Prompt`, `start_trace`, and `retry_delay` are project-defined.
+# Anthropic SDK shown; OpenAI/Bedrock have analogous shapes.
+import random
+import asyncio
+from anthropic import AsyncAnthropic, APIStatusError, APITimeoutError, RateLimitError
+from pydantic import ValidationError
+
+client = AsyncAnthropic()
+
+def _extract_text(response) -> str:
+    # response.content is a list of content blocks (TextBlock | ToolUseBlock | ...).
+    # Concatenate text blocks; ignore tool_use here (handle separately if you allow tools).
+    return "".join(b.text for b in response.content if b.type == "text")
+
+def _backoff(attempt: int, retry_after: float | None = None, cap: float = 30.0) -> float:
+    if retry_after is not None:  # honor server hint (Anthropic and OpenAI both surface this)
+        return min(cap, retry_after)
+    base = min(cap, 0.5 * (2 ** attempt))
+    return random.uniform(0, base)  # full jitter
+
 async def call_llm(
-    prompt: Prompt,
+    prompt: "Prompt",
     *,
     schema: type[T],
     model: str,
@@ -185,33 +205,37 @@ async def call_llm(
     try:
         for attempt in range(3):
             try:
-                async with timeout(timeout_s):
+                async with asyncio.timeout(timeout_s):
                     response = await client.messages.create(
                         model=model,
                         max_tokens=max_tokens,
-                        messages=prompt.messages,
                         system=prompt.system,
-                        tools=prompt.tools,
+                        messages=prompt.messages,
+                        tools=prompt.tools or [],
                     )
                 trace.record_response(response)
-                parsed = schema.model_validate_json(response.content)
+                parsed = schema.model_validate_json(_extract_text(response))
                 trace.record_success(parsed)
                 return parsed
             except ValidationError as e:
                 if attempt == 2:
                     raise
-                prompt = prompt.with_validation_feedback(e)
+                prompt = prompt.with_validation_feedback(e)  # project helper
             except RateLimitError as e:
-                await asyncio.sleep(retry_delay(attempt, e.retry_after))
-            except (TimeoutError, ProviderError) as e:
+                # SDK exposes response headers including `retry-after`
+                retry_after = float(e.response.headers.get("retry-after")) if e.response else None
+                await asyncio.sleep(_backoff(attempt, retry_after))
+            except (APITimeoutError, APIStatusError, asyncio.TimeoutError):
                 if attempt == 2:
                     raise
-                await asyncio.sleep(retry_delay(attempt))
+                await asyncio.sleep(_backoff(attempt))
     finally:
         trace.finish()
 ```
 
-This is not the only shape, but every production wrapper has these elements: structured input, schema-validated output, bounded retries with the right policy per error class, a timeout, a trace. A new LLM feature should reuse one of these wrappers, not call the SDK directly.
+This is not the only shape, but every production wrapper has these elements: structured input, content-block-aware extraction (Anthropic returns a list of content blocks, not a JSON string), schema-validated output, bounded retries with the right policy per error class (honoring `retry-after` for rate limits, full jitter elsewhere), a timeout, a trace. A new LLM feature should reuse one of these wrappers, not call the SDK directly.
+
+For structured outputs natively, prefer the provider's first-class mechanism (Anthropic tool use with a JSON schema and `tool_choice`; OpenAI `response_format={"type": "json_schema", "strict": true}`) instead of free-text + post-hoc validation when the call is purely for data extraction.
 
 ## What to read next
 
