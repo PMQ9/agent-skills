@@ -30,6 +30,14 @@ Picking rules:
 | nodejs-backend | [.claude/skills/engineering/backend/nodejs-backend/SKILL.md](.claude/skills/engineering/backend/nodejs-backend/SKILL.md) | Node.js / TypeScript backends — Fastify, Hono, Express, NestJS; Zod validation; Drizzle, Prisma; async error handling; auth; testing. |
 | go-backend | [.claude/skills/engineering/backend/go-backend/SKILL.md](.claude/skills/engineering/backend/go-backend/SKILL.md) | Go services — net/http, chi/echo/gin/fiber, goroutines, channels, context, error wrapping, database/sql/sqlx/sqlc/pgx/GORM, slog, table-driven tests, pprof. |
 
+### Engineering / Frontend
+
+| Skill | Path | Use when |
+|---|---|---|
+| frontend-development | [.claude/skills/engineering/frontend/frontend-development/SKILL.md](.claude/skills/engineering/frontend/frontend-development/SKILL.md) | Framework-agnostic frontend work — HTML/CSS/JS fundamentals, browser APIs, web performance, bundle size, asset loading, forms, build tooling (Vite/esbuild/Turbopack/webpack), monorepos, design systems, i18n, browser compat, progressive enhancement. |
+| frontend-react-next | [.claude/skills/engineering/frontend/frontend-react-next/SKILL.md](.claude/skills/engineering/frontend/frontend-react-next/SKILL.md) | React and Next.js — components, hooks, RSC vs client, App/Pages Router, server actions, caching (`fetch`/`unstable_cache`/`revalidatePath`), TanStack Query, hydration mismatches, `"use client"`/`"use server"`, Vitest/Playwright. |
+| accessibility-wcag | [.claude/skills/engineering/frontend/accessibility-wcag/SKILL.md](.claude/skills/engineering/frontend/accessibility-wcag/SKILL.md) | Web accessibility — WCAG 2.1/2.2, Section 508, ADA, EN 301 549, ARIA, semantic HTML, keyboard navigation, focus management, screen readers (NVDA/JAWS/VoiceOver), contrast, axe/Lighthouse, VPAT/ACR, a11y remediation. |
+
 ### Engineering / Data
 
 | Skill | Path | Use when |
@@ -37,6 +45,7 @@ Picking rules:
 | database-design | [.claude/skills/engineering/data/database-design/SKILL.md](.claude/skills/engineering/data/database-design/SKILL.md) | Schema modeling, normalization, indexing strategy, transaction/isolation reasoning, migration discipline — engine-agnostic. |
 | postgresql | [.claude/skills/engineering/data/postgresql/SKILL.md](.claude/skills/engineering/data/postgresql/SKILL.md) | Postgres-specific work — EXPLAIN, JSONB, GIN, partitioning, replication, `pg_stat`, pgbouncer, vacuum, WAL, query tuning. |
 | pgvector-embeddings | [.claude/skills/engineering/data/pgvector-embeddings/SKILL.md](.claude/skills/engineering/data/pgvector-embeddings/SKILL.md) | Vector similarity search and RAG — pgvector schema, index choice (HNSW vs IVFFlat), chunking, hybrid search, when to graduate to a dedicated vector DB. |
+| redis-caching | [.claude/skills/engineering/data/redis-caching/SKILL.md](.claude/skills/engineering/data/redis-caching/SKILL.md) | Redis / Valkey / KeyDB / Dragonfly / ElastiCache / Upstash — caching strategies, TTLs, eviction, key design, data structures (sorted sets, streams, HyperLogLog), distributed locks, rate limiting, pub/sub, Lua, pipelining, Cluster, hot/big keys, cache stampedes. |
 
 ### Engineering / Cloud
 
@@ -83,6 +92,7 @@ Picking rules:
 |---|---|---|
 | ferpa-compliance | [.claude/skills/engineering/compliance/ferpa-compliance/SKILL.md](.claude/skills/engineering/compliance/ferpa-compliance/SKILL.md) | FERPA rules for student data — education records, directory info, parent/guardian access, SIS/registrar data, rosters, grades, advising, vendor disclosures. |
 | vanderbilt-data-classification | [.claude/skills/engineering/compliance/vanderbilt-data-classification/SKILL.md](.claude/skills/engineering/compliance/vanderbilt-data-classification/SKILL.md) | Vanderbilt's L1–L4 data classification + approved-AI-tool matrix (ChatGPT Edu / Amplify / Copilot), masking/redaction before LLM calls, M365 sensitivity labels, when to escalate to Cybersecurity. |
+| hipaa-compliance | [.claude/skills/engineering/compliance/hipaa-compliance/SKILL.md](.claude/skills/engineering/compliance/hipaa-compliance/SKILL.md) | PHI / ePHI handling — HIPAA Privacy/Security/Breach Notification Rules, 2025 Security Rule update, BAAs, 18 identifiers, Safe Harbor / Expert Determination, EHR integrations (Epic/Cerner/Athena), VUMC clinical data, FHIR/HL7, sending PHI to LLMs. |
 
 ### Engineering / AI
 
@@ -96,6 +106,8 @@ Picking rules:
 | prompt-injection-defense | [.claude/skills/engineering/ai/prompt-injection-defense/SKILL.md](.claude/skills/engineering/ai/prompt-injection-defense/SKILL.md) | LLM security — direct/indirect prompt injection, jailbreaks, untrusted content, capability containment, output validation, exfiltration vectors (URLs, markdown, file writes), agent threat models. |
 | human-in-the-loop-workflows | [.claude/skills/engineering/ai/human-in-the-loop-workflows/SKILL.md](.claude/skills/engineering/ai/human-in-the-loop-workflows/SKILL.md) | HITL design — approval gates, review queues, confidence thresholds, escalation UX, reviewer tooling, feedback loops to prompts/training, moderation/QA at scale, active learning. |
 | amplify-platform | [.claude/skills/engineering/ai/amplify-platform/SKILL.md](.claude/skills/engineering/ai/amplify-platform/SKILL.md) | Vanderbilt's Amplify GenAI platform (`gaiin-platform` org) — backend Lambda services, Next.js frontend, Terraform IaC, agent loop, MCP registration via DynamoDB, Cognito JWT, `/chat` & `/files/*` & `/user-data/*` endpoints, CCC drafting pipeline integration. |
+| multi-agent-orchestration | [.claude/skills/engineering/ai/multi-agent-orchestration/SKILL.md](.claude/skills/engineering/ai/multi-agent-orchestration/SKILL.md) | Coordinating multiple LLM agents — orchestrator/worker, supervisor/router, parallel agents, handoffs, A2A protocol, planner-executor splits, swarms, LangGraph/CrewAI/AutoGen/OpenAI Agents SDK, "one agent or many," sub-agents, context overflow. |
+| llm-cost-optimization | [.claude/skills/engineering/ai/llm-cost-optimization/SKILL.md](.claude/skills/engineering/ai/llm-cost-optimization/SKILL.md) | Reducing LLM token cost and latency — model selection (Opus/Sonnet/Haiku, GPT-5/4o/4-mini, Gemini Pro/Flash), prompt caching, batch APIs, model routing/cascades, semantic caching, output length control, distillation, "the bill is too high," prod cost scaling. |
 
 ## Adding a new skill
 
