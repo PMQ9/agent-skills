@@ -94,6 +94,7 @@ Picking rules:
 | mcp-server-design | [.claude/skills/engineering/ai/mcp-server-design/SKILL.md](.claude/skills/engineering/ai/mcp-server-design/SKILL.md) | Model Context Protocol servers — tools vs resources vs prompts, schema design, error handling, auth, transports, pagination, "expose this to Claude," debugging tool-calling. |
 | prompt-injection-defense | [.claude/skills/engineering/ai/prompt-injection-defense/SKILL.md](.claude/skills/engineering/ai/prompt-injection-defense/SKILL.md) | LLM security — direct/indirect prompt injection, jailbreaks, untrusted content, capability containment, output validation, exfiltration vectors (URLs, markdown, file writes), agent threat models. |
 | human-in-the-loop-workflows | [.claude/skills/engineering/ai/human-in-the-loop-workflows/SKILL.md](.claude/skills/engineering/ai/human-in-the-loop-workflows/SKILL.md) | HITL design — approval gates, review queues, confidence thresholds, escalation UX, reviewer tooling, feedback loops to prompts/training, moderation/QA at scale, active learning. |
+| amplify-platform | [.claude/skills/engineering/ai/amplify-platform/SKILL.md](.claude/skills/engineering/ai/amplify-platform/SKILL.md) | Vanderbilt's Amplify GenAI platform (`gaiin-platform` org) — backend Lambda services, Next.js frontend, Terraform IaC, agent loop, MCP registration via DynamoDB, Cognito JWT, `/chat` & `/files/*` & `/user-data/*` endpoints, CCC drafting pipeline integration. |
 
 ## Adding a new skill
 
