@@ -15,7 +15,19 @@ PII = any data that can identify a person, alone or in combination with other da
 - **Financial**: aid awards, balances, bank info, payment cards
 - **Health**: disability accommodations, immunization records (often FERPA, sometimes HIPAA — escalate if HIPAA-scope)
 
-The legal regime depends on the data: FERPA for education records (most of the above), GLBA for financial data tied to aid, HIPAA for true medical records, state breach-notification laws (the patchwork now spans CO/VA/CT/UT/TX/FL/OR/IA/DE/NJ/IN/MT and others — confirm against the institution's home state and any state where data subjects reside), PCI-DSS 4.0 for payment cards (effective March 2025), and the institution's own data-classification policy. Don't try to memorize the matrix — escalate to the privacy office for novel data flows.
+The legal regime depends on the data:
+
+- **FERPA** for education records (most of the above).
+- **GLBA + FTC Safeguards Rule** (effective June 2023) for financial data tied to aid.
+- **HIPAA** for true medical records.
+- **State comprehensive privacy laws.** As of 2026 the patchwork spans ~20 states with comprehensive consumer-privacy regimes (each with their own thresholds, definitions of sensitive data, and rights). The relevant set for higher-ed in 2026 includes: California (CCPA/CPRA), Colorado, Connecticut, Utah, Virginia, Texas (TDPSA, eff. July 2024), Florida, Oregon, Iowa, Delaware, New Jersey, Indiana, Montana, **Tennessee (TIPA, eff. July 2025 — directly relevant for VU/Vanderbilt)**, **Maryland (MODPA, eff. Oct 2025)**, **Minnesota (CDPA, eff. July 2025)**, **New Hampshire (SB 255, eff. Jan 2025)**. Confirm against the institution's home state and any state where data subjects reside.
+- **State breach-notification laws** — all 50 states have one; thresholds and timelines vary.
+- **PCI DSS v4.0.1** for payment cards. v4.0 was published March 2022; **v4.0.1 superseded it in 2024**, and the previously future-dated v4.x requirements (the "best-practice" tier) became **mandatory March 31, 2025**. If you handle cardholder data, you're on v4.0.1 today.
+- **EU GDPR** — applies to EU data subjects regardless of where you are.
+- **EU AI Act** — in force 2024; phased applicability through 2027. Relevant when LLM features process EU-resident PII; high-risk AI obligations include data-quality, transparency, and human-oversight requirements.
+- The institution's own data-classification policy (for Vanderbilt, see `vanderbilt-data-classification`).
+
+Don't try to memorize the matrix — escalate to the privacy office for novel data flows.
 
 This skill covers the engineering. Pair with `ferpa-compliance` for the legal rules and `application-security` for transport and injection concerns.
 
@@ -81,7 +93,7 @@ class Student(Base):
 
 **Tokenization** for PII used as keys. If you need to reference a student in many systems, use an internal opaque ID (UUID) — never the raw SSN, government ID, or even the student ID — as the join key in non-authoritative systems. The mapping lives in one secured store.
 
-**Hashing** for "is this the same person as before" checks where you don't need to recover the value. HMAC with an institution-wide salt held in KMS is appropriate; plain SHA-256 is not (rainbow tables on common values like SSNs are trivial).
+**Hashing** for "is this the same person as before" checks where you don't need to recover the value. **HMAC with a secret key held in KMS** is appropriate — the security comes from the secret key, not from a "salt" (salts are non-secret by definition; conflating the two is a common bug). Plain SHA-256 is not appropriate (rainbow tables on common values like SSNs are trivial). BLAKE2 or BLAKE3 in keyed mode work equivalently. Rotate the HMAC key on the same cadence as other secret-bearing keys, and version the output so old hashes can be recognized after rotation.
 
 **No PII in URLs.** URLs end up in browser history, server access logs, referer headers, CDN logs, email previews, screenshots, error trackers. Use POST bodies or path segments that are opaque IDs, not paths like `/transcripts?ssn=...` or `/student/[email protected]`.
 
@@ -139,6 +151,11 @@ FERPA gives students the right to inspect, and (with some constraints) to reques
 - **Retention and purge** — once records are out of retention, purge. Verify the purge ran. Verify it ran in backups and replicas, not just the primary.
 - **Deletion under FERPA**: most education records are retained for years per institutional policy and accreditation requirements. Don't surprise-delete records that the institution must retain. The privacy office sets the policy.
 - **Tombstones in audit logs**: the audit log of an action persists even after the underlying record is purged — that's by design. The log entry should reference the deleted record by its opaque ID, not embed the deleted PII.
+- **Embeddings, vector stores, and trained-on data are an erasure trap.** Once student PII has been embedded into a vector and stored in pgvector / Pinecone / Weaviate, "delete that student" requires deleting every vector derived from their text — possible if you indexed by `student_id`, miserable if you didn't. Once PII has been used to fine-tune or further-train a model, it is generally **not recoverable** by deletion at all (the only mitigations are retraining without that data, or model-deletion). Plan for both:
+  - **Vector stores**: tag every embedding with the source `student_id` so a single delete-by-tag scrubs everything derived from one subject. Re-embedding from a scrubbed corpus is the fallback.
+  - **LLM training**: don't fine-tune on raw PII. Use de-identified corpora, or synthetic data, or treat fine-tuning as an irrevocable disclosure that requires the same legal basis as any other vendor sharing.
+  - **GDPR Article 17 / state-law erasure rights** put real teeth on this; the EU AI Act amplifies it for LLM features.
+  - See `pgvector-embeddings` for the storage-layer side of this.
 
 ## Anti-patterns to ban from the codebase
 
@@ -176,7 +193,18 @@ class Student:
 **Error scrubbing for Sentry / Bugsnag**
 
 ```python
-SENSITIVE_KEYS = {"ssn", "dob", "password", "token", "authorization", "cookie", "transcript", "grade"}
+# Keep this list in sync with the audit-logging skill's REDACT_FIELDS,
+# or import a shared constant — the two were drifting historically.
+SENSITIVE_KEYS = {
+    # auth
+    "password", "token", "api_key", "secret", "authorization", "cookie",
+    # direct identifiers
+    "ssn", "social_security_number", "dob", "date_of_birth", "birth_date", "birthdate",
+    # education / FERPA
+    "transcript", "grade", "gpa",
+    # health / HIPAA
+    "diagnosis", "mrn", "medical_record_number",
+}
 
 def scrub_event(event, hint):
     def scrub(obj):

@@ -21,7 +21,7 @@ The two failure modes are: (1) the secret leaks, and (2) the secret can't be rot
 1. **Plaintext in code or config files** — wrong. Skip.
 2. **Plaintext in `.env` files, gitignored** — fine for local dev *only*. Don't kid yourself that this is "secret"; it's just out of view.
 3. **Environment variables injected at deploy time from a CI variable store** — workable for small teams. CI variable stores (GitHub Actions secrets, GitLab CI variables) are encrypted at rest and masked in logs, but reading and rotation are clunky and there's no audit trail of *runtime* access.
-4. **A dedicated secret manager** (Vault, AWS Secrets Manager, GCP Secret Manager, Azure Key Vault, 1Password Secrets Automation) — the right answer for production. Centralized, audited, rotation-capable, access-controlled.
+4. **A dedicated secret manager** (Vault, **OpenBao**, AWS Secrets Manager, GCP Secret Manager, Azure Key Vault, 1Password Secrets Automation) — the right answer for production. Centralized, audited, rotation-capable, access-controlled.
 5. **Workload identity + short-lived dynamic credentials** — best. The workload authenticates with its platform identity and gets a fresh, scoped credential per session. No long-lived secret to leak.
 
 When advising a team, push them up the ladder, but don't let perfect block good. Going from "in Git" to "in a CI secret store" is a real win even if the eventual goal is Vault + dynamic credentials.
@@ -43,13 +43,13 @@ Do not share dev `.env` files in Slack, email, or "team password docs." The CI's
 
 The modern default on a cloud platform.
 
-- **AWS:** EKS pods get an IAM role via IRSA (IAM Roles for Service Accounts). The pod's SDK calls Secrets Manager / SSM with that role. No keys.
-- **GCP:** GKE Workload Identity binds a Kubernetes ServiceAccount to a Google Service Account; the SDK gets a token automatically.
-- **Azure:** AKS Workload Identity / federated credentials does the equivalent.
+- **AWS:** Two viable workload-identity paths on EKS — **EKS Pod Identity** (GA late 2023, AWS's recommended default for new clusters; simpler trust policy via the `eks-pod-identity-agent` add-on) and **IRSA** (IAM Roles for Service Accounts, OIDC-based, the long-standing path; still supported and ubiquitous in existing clusters). Both eliminate static keys and let pods call Secrets Manager / SSM with the workload's identity. Pick Pod Identity for new clusters; keep IRSA where it's already wired.
+- **GCP:** **GKE Workload Identity Federation** binds a Kubernetes ServiceAccount to a Google Service Account; the SDK gets a token automatically. (The legacy "GKE Workload Identity" mode still exists; Federation is Google's recommended path.)
+- **Azure:** **AKS Workload Identity** (federated credentials) does the equivalent. The deprecated AAD Pod Identity reached end-of-life in September 2024 — migrate any remaining clusters.
 
 This eliminates the bootstrap problem ("how does the secret-fetcher authenticate?") because the platform does it. *Always* prefer this on a cloud-native deployment.
 
-### Pattern B — HashiCorp Vault
+### Pattern B — HashiCorp Vault / OpenBao
 
 Vault shines when you're multi-cloud, on-prem, or need features the cloud-native managers lack:
 
@@ -58,14 +58,16 @@ Vault shines when you're multi-cloud, on-prem, or need features the cloud-native
 - **PKI engine** for short-lived certs / mTLS.
 - **AppRole or k8s auth method** for workload authentication.
 
-Vault is operationally heavy. Run it as HA (Raft storage), back it up religiously (auto-unseal with cloud KMS so you don't have to rebuild Shamir keys at 3 AM), and treat the root token like radioactive material.
+**Licensing note (2026):** HashiCorp Vault relicensed to BSL in August 2023; the OSI-licensed fork is **OpenBao** (Linux Foundation, MPL-2.0; **OpenBao 2.0 GA in 2024**). API and CLI compatibility with Vault is the explicit goal — `bao` works as a drop-in `vault` for most engines. Open-source-policy-conscious teams should evaluate OpenBao for new deployments; HashiCorp Vault Enterprise is still the right answer when its enterprise features (HSM auto-unseal, namespaces, performance replication) earn their cost.
+
+Vault/OpenBao is operationally heavy. Run it as HA (Raft storage), back it up religiously (auto-unseal with cloud KMS so you don't have to rebuild Shamir keys at 3 AM), and treat the root token like radioactive material.
 
 ### Pattern C — Kubernetes-native secrets-in-Git
 
 When you want secrets in Git for GitOps (with auditability) without leaking them, two main tools:
 
-- **SOPS** — encrypt the secret file with a KMS key (AWS KMS, GCP KMS, age, PGP). The file in Git is ciphertext; only principals with KMS access can decrypt. Kustomize and Flux integrate natively. Argo CD via plugin.
-- **Sealed Secrets (Bitnami)** — encrypt with a public key whose private key lives only in the cluster controller. Cluster decrypts on the fly. Simpler than SOPS but cluster-bound (a sealed secret encrypted for cluster A won't decrypt in cluster B; treat the controller key as cluster state to back up).
+- **SOPS** — encrypt the secret file with a KMS key. Modern key choices, in order of preference: **age** (small, modern, key files instead of the GPG keyring; the recommended local/offline option), **AWS KMS / GCP KMS / Azure Key Vault** (cloud-managed, IAM-controlled). PGP still works but is the legacy path; prefer age for new repos. The file in Git is ciphertext; only principals with key access can decrypt. Kustomize and Flux integrate natively. Argo CD via plugin.
+- **Sealed Secrets (Bitnami)** — encrypt with a public key whose private key lives only in the cluster controller. Cluster decrypts on the fly. Simpler than SOPS but cluster-bound (a sealed secret encrypted for cluster A won't decrypt in cluster B; treat the controller key as cluster state to back up). Adoption is declining vs. External Secrets Operator (Pattern D) which avoids putting the value in Git at all.
 
 For both, the *value* of the secret is encrypted; metadata (the fact that there's a secret named `db-password` for service `api`) is not. That's usually fine.
 
@@ -74,7 +76,7 @@ For both, the *value* of the secret is encrypted; metadata (the fact that there'
 The bridge pattern. The actual secret lives in an external manager (Vault, AWS, GCP, etc.). An ExternalSecret CR in the cluster specifies "fetch X from manager Y, materialize as a Kubernetes Secret named Z." The operator polls and keeps the Secret in sync.
 
 ```yaml
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata: { name: api-db-creds }
 spec:
@@ -85,6 +87,8 @@ spec:
     - secretKey: DATABASE_URL
       remoteRef: { key: prod/api/db, property: url }
 ```
+
+ESO graduated `external-secrets.io/v1` to GA in 2024; `v1beta1` still works for backward compatibility but new manifests should target `v1`. Pair with workload identity on the operator's pod (IRSA / Pod Identity / Workload Identity Federation) so ESO itself authenticates without a static credential.
 
 This is the right answer when you want GitOps for *what* secrets exist (the ExternalSecret is in Git) without putting the *value* in Git at all.
 

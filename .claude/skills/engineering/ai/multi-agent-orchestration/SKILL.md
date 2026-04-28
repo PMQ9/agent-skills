@@ -182,12 +182,12 @@ You don't need a framework to build a multi-agent system — orchestrator-worker
 
 | Framework | Strengths | When |
 |---|---|---|
-| **LangGraph** | Explicit graph, durable execution, time-travel debugging, strong tracing via LangSmith. | Production workflows where observability and resumability matter. |
-| **OpenAI Agents SDK** (Swarm successor) | Lightweight, handoff-first, minimal abstractions. | Conversational handoff systems, especially OpenAI-stack shops. |
+| **LangGraph 0.3+** | Explicit state-machine graph, durable execution and checkpointing, time-travel debugging, native human-in-the-loop interrupts, strong tracing via LangSmith. | Production workflows where observability, resumability, and HITL matter. |
+| **OpenAI Agents SDK** (Swarm successor) | Lightweight, handoff-first, minimal abstractions; pairs with the OpenAI Responses API. | Conversational handoff systems, especially OpenAI-stack shops. |
 | **CrewAI** | Role/goal abstractions, easy team composition. | Prototyping multi-agent ideas quickly; demos. Less customizable for production edge cases. |
-| **AutoGen** (Microsoft) | Conversation-first, code execution agents, group chat patterns. | Research-style group conversation between agents. |
-| **Anthropic Agents SDK** + Claude Agent SDK | Direct, file-system + bash + tool primitives. The pattern Claude Code uses. | Coding agents and Claude-stack work. |
-| **Pydantic AI** | Type-safe, Python-idiomatic. | Python teams who want type safety and observability without a heavy graph abstraction. |
+| **AutoGen v0.4+** (Microsoft) | The 2024 rewrite is event-driven and actor-based (a clean break from v0.2's chat-loop model); cross-language (Python + .NET); group chat patterns; code-execution agents. | Research-style group conversation between agents; teams that want an event-bus model. Migration from v0.2 is non-trivial. |
+| **Claude Agent SDK** (formerly Claude Code SDK, renamed 2025) | Direct file-system + bash + tool primitives, sub-agent dispatch via the `Task` tool, context auto-compaction. The pattern Claude Code itself uses. | Coding agents and Claude-stack work. |
+| **Pydantic AI** | Type-safe, Python-idiomatic, model-agnostic. | Python teams who want type safety and observability without a heavy graph abstraction. |
 | **Hand-rolled** | Full control, no abstraction tax. | Most production systems should at least start here, then migrate if a framework's value clearly outweighs its complexity. |
 
 A common mistake: **picking a framework before understanding the pattern you need.** Frameworks bias toward their preferred pattern. If you start in CrewAI and discover you need orchestrator-worker, you'll fight it; LangGraph would have been better.

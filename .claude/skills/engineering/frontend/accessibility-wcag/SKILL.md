@@ -7,9 +7,35 @@ description: Use this skill for any work involving web accessibility — WCAG 2.
 
 Accessibility is not an extra feature you add to a finished product. It's a property of the structure of the UI — there for free if you build the right thing, expensive to bolt on if you didn't. About 1 in 4 adults in the US has some form of disability; on the web that translates to people using screen readers, screen magnifiers, switch devices, voice control, eye tracking, keyboard-only navigation, high-contrast modes, reduced motion, captions, and a long tail of assistive tech you've never seen. A site that doesn't work for them is broken for them, fully.
 
-The legal frame in 2026: **ADA Title II** (now applies to state and local government digital services with WCAG 2.1 AA conformance required by April 2026/2027 depending on entity size), **ADA Title III** (private business; courts continue to find websites are places of public accommodation), **Section 508** (US federal procurement; WCAG 2.0 AA), **EN 301 549** + **European Accessibility Act** (EU; effective June 2025 for many products including e-commerce). For higher education in the US, Title II of the ADA plus Section 504 of the Rehabilitation Act apply — Vanderbilt's clinical and university web properties have WCAG 2.1 AA as the operating target.
+The legal frame in 2026 (already-in-force obligations, not future):
 
-The technical baseline is **WCAG 2.1 AA** for almost everyone. WCAG 2.2 added 9 success criteria in 2023 and is the current published version; conformance to 2.2 is the ambitious target. WCAG 3.0 is in draft and won't be a regulatory standard for years.
+- **ADA Title II** — DOJ final rule (April 2024) requires state and local government digital services to conform to **WCAG 2.1 AA**. Compliance for entities ≥50,000 population took effect **April 24, 2026** (already passed). Smaller entities (<50,000 and special-district governments) must comply by **April 24, 2027**.
+- **ADA Title III** — private business; courts continue to find websites are places of public accommodation. No specific federal standard cited, but WCAG 2.1 AA is the de-facto litigation benchmark.
+- **Section 508** — US federal procurement; references **WCAG 2.0 AA** (a Refresh aligning with 2.x is in proposed-rulemaking, not yet final).
+- **EN 301 549 v3.2.1** — EU public-sector procurement standard; references WCAG 2.1.
+- **European Accessibility Act (EAA)** — Directive 2019/882; **enforcement began June 28, 2025** for products and services in scope (e-commerce, banking, e-books, transport ticketing, ATMs, smartphones/computers). EU member states implement nationally; e-commerce sites serving EU consumers are now subject.
+
+For US higher education, Title II of the ADA plus Section 504 of the Rehabilitation Act apply. Vanderbilt's clinical and university web properties operate against **WCAG 2.2 AA** as of 2026 — vendor procurement increasingly demands 2.2 even where 2.1 would technically satisfy.
+
+**The technical baseline in 2026 is WCAG 2.2 AA**, not 2.1. WCAG 2.2 was published as a W3C Recommendation in October 2023 and added 9 new success criteria; modern procurement and remediation work targets 2.2. WCAG 2.1 AA remains the regulatory floor in many statutes (ADA Title II rule, Section 508 still on 2.0); meeting 2.2 satisfies both. WCAG 3.0 remains in working draft and will not be a regulatory standard for years.
+
+### What WCAG 2.2 added (the 9 new success criteria)
+
+Memorize the AA additions; the AAA ones are aspirational.
+
+| SC | Level | What it requires |
+|---|---|---|
+| 2.4.11 Focus Not Obscured (Minimum) | AA | When a component receives keyboard focus, it isn't *entirely* hidden by author-created content (sticky headers, cookie banners). |
+| 2.4.12 Focus Not Obscured (Enhanced) | AAA | Stronger version: focus indicator isn't obscured at all. |
+| 2.4.13 Focus Appearance | AAA | Focus indicator meets specific size and contrast thresholds. |
+| 2.5.7 Dragging Movements | AA | Any drag interaction (sliders, kanban) has a single-pointer alternative — click-to-move, increment buttons, etc. |
+| 2.5.8 Target Size (Minimum) | AA | Touch targets ≥ **24×24 CSS pixels**, with documented exceptions (inline links, user-agent default, equivalents elsewhere on page, essential). |
+| 3.2.6 Consistent Help | A | If a help mechanism (contact info, FAQ link, chat) appears on multiple pages, it appears in the same relative order. |
+| 3.3.7 Redundant Entry | A | Information already entered in the same process is auto-filled or selectable, not re-typed (e.g., billing address pre-fills from shipping). |
+| 3.3.8 Accessible Authentication (Minimum) | AA | No cognitive function test (recognize images, transcribe, solve puzzles) required for auth — unless an alternative is provided, or the test recognizes objects/non-text content the user provided. Password managers must work (don't block paste, don't break autofill). |
+| 3.3.9 Accessible Authentication (Enhanced) | AAA | Stronger version: no object-recognition exception. |
+
+The ones that bite engineering teams most: **2.5.8 Target Size** (most existing icon buttons are smaller than 24×24), **3.3.8 Accessible Authentication** (any "type the characters in this image" or paste-blocked password field fails), and **2.4.11 Focus Not Obscured** (sticky bottom bars and floating chat widgets routinely cover the focused row in long forms).
 
 ## How to think about WCAG
 
@@ -89,7 +115,7 @@ Common mistakes:
 - **`aria-hidden` on an interactive element**. Hides it from screen readers but keeps it in the keyboard tab order — confusing. Use `inert` on the container instead.
 - **Reinventing widgets with ARIA**. A custom listbox, combobox, tree, or grid built with ARIA is one of the hardest things in web development. Use a vetted library (Radix, React Aria, headless-ui, Reach UI's successors) or use `<select>`, `<datalist>`, `<details>`, `<dialog>` where you can.
 
-The **ARIA Authoring Practices Guide** documents the keyboard interaction patterns expected for each widget type. Read the relevant section before building anything custom.
+The **ARIA Authoring Practices Guide (APG)** documents the keyboard interaction patterns expected for each widget type. Read the relevant section before building anything custom.
 
 ## Keyboard
 
@@ -187,7 +213,7 @@ Tools:
 - axe DevTools, WAVE, Lighthouse all report contrast.
 - Manually: use a contrast checker (WebAIM, Stark).
 
-The **APCA** (Advanced Perceptual Contrast Algorithm) is the WCAG 3 candidate and a more accurate model for actual perception, but until WCAG 3 is normative, AA is what you must meet. Some design systems already check both.
+**APCA** (Advanced Perceptual Contrast Algorithm) is one of the contrast-method candidates the W3C is evaluating for WCAG 3, and is a more perceptually accurate model than the WCAG 2.x ratio formula. Until WCAG 3 is normative, the 4.5:1 / 3:1 ratios above are what you must meet. Some design systems check both.
 
 ### Don't convey by color alone
 
@@ -237,7 +263,7 @@ The hardest patterns to get right. Use a vetted library when possible:
 - **Vue**: Radix Vue, Headless UI for Vue.
 - **Vanilla**: a11y-dialog, Reach UI patterns.
 
-If you must build one yourself, the WAI-ARIA Authoring Practices Guide is the spec. The patterns are precise: which keys do what, what ARIA attributes are required, how focus moves.
+If you must build one yourself, the **ARIA Authoring Practices Guide (APG)** is the reference. The patterns are precise: which keys do what, what ARIA attributes are required, how focus moves. Note: APG documents *patterns*, not normative requirements — pair with WAI-ARIA 1.2 (current REC) and 1.3 (in CR) for the spec layer.
 
 For **modals/dialogs**, the requirements:
 
@@ -335,7 +361,7 @@ For those, you need manual testing.
 ### Manual testing (catches the rest)
 
 - **Tab through every page.** Sensible order? Visible focus? Everything reachable? Anything that shouldn't be reachable (decorative)?
-- **Use the page with a screen reader** for at least one full flow per release. NVDA on Windows (free), VoiceOver on Mac/iOS, TalkBack on Android, JAWS if you have a license.
+- **Use the page with a screen reader** for at least one full flow per release. **NVDA 2024.4+** on Windows (free), **VoiceOver** on macOS 15 / iOS 18 / iOS 19, **TalkBack** on Android 14+, **JAWS 2025** if you have a license. The 2026 baseline support matrix at most institutions is the latest two versions of NVDA + JAWS plus current macOS and iOS.
 - **Zoom to 200% and 400%.** Does anything overflow, become unreadable, or lose function? (WCAG 1.4.4 / 1.4.10.)
 - **High contrast / forced colors mode** (Windows). Are borders/backgrounds still distinguishable?
 - **Voice control** — Voice Control on Mac, Voice Access on Windows. Can you say "click Save"? If not, your accessible name is wrong.

@@ -95,9 +95,9 @@ Mark server-only modules with `import "server-only"` at the top. If anyone tries
 
 This is where production apps trip over themselves. Next.js layers four caches:
 
-1. **`fetch` cache** — by default, `fetch()` in a server component is cached. Pass `cache: 'no-store'` or `next: { revalidate: 60 }` to control. Off by default in Next 15+ for `fetch`; check your version.
-2. **Data cache (`unstable_cache`)** — wrap arbitrary async functions to memoize across requests. Keyed and tagged.
-3. **Full-route cache** — fully static pages get cached at build/ISR time.
+1. **`fetch` cache** — in **Next 15+, `fetch()` in a server component is uncached by default** (this flipped from Next 14, where caching was the default). Opt in explicitly per call with `cache: 'force-cache'` or `next: { revalidate: 60 }`. The `'use cache'` directive (canary in Next 15.x) is the successor to `unstable_cache` for opting whole functions / segments / pages into caching.
+2. **Data cache (`unstable_cache` / `'use cache'`)** — wrap arbitrary async functions to memoize across requests. Keyed and tagged. `unstable_cache` still works; `'use cache'` is the in-development directive replacement.
+3. **Full-route cache** — fully static pages get cached at build/ISR time. **Partial Prerendering (PPR)** is canary in Next 15.x and lets one route mix a static prerendered shell with dynamic Suspense'd holes — opt in via `experimental.ppr` and per-page `export const experimental_ppr = true`.
 4. **Router cache** — client-side, prefetched route segments.
 
 To invalidate:
@@ -109,8 +109,11 @@ To invalidate:
 Pattern that works well:
 
 ```ts
-// fetch with a tag
-const data = await fetch(url, { next: { tags: ['students'] } });
+// fetch with explicit cache opt-in and a tag (Next 15+ defaults to no-store)
+const data = await fetch(url, {
+  cache: 'force-cache',
+  next: { tags: ['students'], revalidate: 60 },
+});
 
 // in a server action that mutates students
 'use server';
@@ -120,7 +123,33 @@ export async function deleteStudent(id: string) {
 }
 ```
 
-Don't fight the cache. Read [the official docs section on caching](https://nextjs.org/docs) for your specific Next version, because behavior has changed across 13 → 14 → 15. Defaults flipped in Next 15.
+Don't fight the cache. Read [the official docs section on caching](https://nextjs.org/docs) for your specific Next version, because defaults flipped in Next 15 and the `'use cache'` directive surface is still moving.
+
+### Async request APIs in Next 15
+
+Centralize this rule because everyone trips on it: **`params`, `searchParams`, `cookies()`, `headers()`, `draftMode()` all return Promises in Next 15+.** Always `await` them.
+
+```tsx
+// app/students/[id]/page.tsx
+export default async function Page({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { id } = await params;
+  const { tab } = await searchParams;
+  // ...
+}
+
+// in a server action / route handler
+import { cookies, headers } from 'next/headers';
+const cookieStore = await cookies();
+const session = cookieStore.get('session');
+```
+
+The Next 14 → 15 codemod (`npx @next/codemod@canary next-async-request-api`) handles most callsites; verify your own code afterward.
 
 ## Server actions
 
@@ -157,11 +186,89 @@ export async function createStudent(formData: FormData) {
 Server actions are just RPC with React-flavored ergonomics. Treat them like API endpoints:
 
 - **Always validate input** at the boundary (Zod, Valibot). The client is untrusted, even when the call looks like a function call.
-- **Always check authz** inside the action. The fact that the action is in your codebase doesn't authorize the caller.
+- **Always check authz inside the action**, even if the page that wraps the form is gated. The page-level gate doesn't run when the action is invoked — the action ID can be discovered and called directly from any client.
+- **Action IDs are encrypted by Next** (build-id-derived key) so they aren't trivially guessable across deploys, but treat them as public regardless. Rotating `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` (or a stable env-provided key for multi-instance deploys) invalidates outstanding action IDs — useful for incident response.
+- **Closed-over variables become inputs.** Anything captured in the closure of a `'use server'` function is serialized and sent to the client as part of the action — never close over secrets, internal IDs the client shouldn't see, or trusted authz state. Pass them in explicitly through `bind` or a new function.
 - **Return serializable values.** Errors as objects, not thrown — or use error boundaries deliberately.
 - **Don't leak server stack traces** to the client. In prod Next.js redacts these by default; don't undo that.
 
-Pair with `useFormState` / `useActionState` and `useFormStatus` for pending UI without writing any client-side fetch boilerplate.
+Pair with `useActionState` (React 19; this replaced the React-18-era `useFormState` from `react-dom`, same shape) and `useFormStatus` for pending UI without writing any client-side fetch boilerplate.
+
+## React 19 / Next 15 surface worth knowing
+
+This is the 2026 baseline. If you write React without these in mind you're using React-the-2023-version with extra hydration footguns.
+
+**`use()`** — unwrap a Promise or context inside a component. The standard way to consume context in 2026, and the standard way to await server-passed data in client components without a useEffect.
+
+```tsx
+'use client';
+import { use } from 'react';
+
+export function StudentClient({ studentPromise }: { studentPromise: Promise<Student> }) {
+  const student = use(studentPromise);   // suspends until resolved
+  return <div>{student.name}</div>;
+}
+
+// server component passes a *promise*, not the awaited value:
+//   <StudentClient studentPromise={getStudent(id)} />
+// the server streams; the client suspends; data arrives without round-trips.
+```
+
+**`useOptimistic`** — present an optimistic UI value before the server confirms.
+
+```tsx
+'use client';
+import { useOptimistic } from 'react';
+
+export function Likes({ count, like }: { count: number; like: () => Promise<number> }) {
+  const [optimistic, addOptimistic] = useOptimistic(count, (n) => n + 1);
+  return (
+    <button onClick={async () => { addOptimistic(null); await like(); }}>
+      {optimistic} likes
+    </button>
+  );
+}
+```
+
+**`ref` as a prop.** React 19 removed `forwardRef` for most cases — function components accept `ref` directly.
+
+```tsx
+// React 18:  forwardRef<HTMLButtonElement, Props>((props, ref) => <button ref={ref} {...props} />)
+// React 19:
+export function Button({ ref, ...props }: Props & { ref?: React.Ref<HTMLButtonElement> }) {
+  return <button ref={ref} {...props} />;
+}
+```
+
+**React Compiler** — stable in React 19.1; enables auto-memoization. Most hand-written `useMemo`/`useCallback`/`memo` calls become unnecessary. Enable in Next.js via `next.config.ts`:
+
+```ts
+// next.config.ts
+const config = {
+  experimental: { reactCompiler: true },
+};
+export default config;
+```
+
+Then profile, and remove memo plumbing the compiler is now handling.
+
+**`after()`** — Next 15 server API for work that should run *after* the response is sent (analytics, audit logs, slow notifications). Doesn't block streaming.
+
+```ts
+import { after } from 'next/server';
+
+export default async function Page() {
+  const data = await getData();
+  after(() => recordPageView(data.id));   // runs after response is flushed
+  return <Render data={data} />;
+}
+```
+
+**`'use cache'`** — canary directive in Next 15.x that opts a function, page, or layout into the data cache. Successor to `unstable_cache`. Still moving; check release notes for your Next version before relying on it.
+
+**Partial Prerendering (PPR)** — canary in Next 15.x. A route mixes a static prerendered shell with dynamic Suspense'd holes. Single deploy, instant TTFB, dynamic data per-request. Opt in via `experimental.ppr` in `next.config.ts` plus `export const experimental_ppr = true` per page.
+
+**Turbopack stable for builds** — `next build --turbo` is stable in Next 15.3+. Significantly faster cold builds than the webpack pipeline.
 
 ## Middleware
 
@@ -233,7 +340,7 @@ Don't apply these by default. They have a cost (the dependency array, the closur
 - The computation is genuinely expensive (rare).
 - A `useEffect` depends on a derived value and you want to control re-runs.
 
-Otherwise: render is cheap, allocations are cheap, just inline it. With **React Compiler** stable in 2026, the calculus changes further: enable it and most of these hand-tuned memos become unnecessary. Profile before pre-optimizing.
+Otherwise: render is cheap, allocations are cheap, just inline it. **React Compiler** is stable in React 19.1 — enable it (see the React 19 / Next 15 section above) and most of these hand-tuned memos become unnecessary. Profile before pre-optimizing.
 
 ### `useState` initializer
 
@@ -352,7 +459,7 @@ export function ClientOnlyTime() {
 }
 ```
 
-Or render the dynamic part only on the client via `dynamic(() => import(...), { ssr: false })`.
+Or render the dynamic part only on the client via `dynamic(() => import(...), { ssr: false })`. **In Next 15+ this must be called from a client component** — calling `dynamic` with `ssr: false` from a server component throws a build error. Wrap it in a `'use client'` boundary.
 
 ## Image, link, font: the Next built-ins
 
@@ -417,8 +524,11 @@ Keep session state in **HTTP-only cookies**. Don't put JWTs in `localStorage`. V
 - `dangerouslySetInnerHTML` on user-supplied content without sanitization. Use a sanitizer (DOMPurify) or, better, render it as React.
 - Catching every error in a try/catch and returning `null`, hiding bugs from your error tracker.
 - `key={index}` on a list of items that reorder. Use a stable id.
-- Forgetting that `params` and `searchParams` in Next 15+ are Promises. Await them.
-- Mixing TanStack Query and React Query (older name). Pick one version, stay on it.
+- Forgetting that `params`, `searchParams`, `cookies()`, `headers()`, and `draftMode()` in Next 15+ all return Promises. Await them.
+- Calling `dynamic(..., { ssr: false })` from a server component in Next 15+ — must be invoked from a client component.
+- Reaching for `forwardRef` in React 19 code. Accept `ref` as a regular prop instead.
+- Closing over secrets or trusted state inside a `'use server'` function — closed-over values are serialized and sent to the client.
+- Using TanStack Query v4 syntax on v5+ (e.g., `isLoading` vs `isPending`, the array-of-args API). The package is `@tanstack/react-query`; v5 is current; pick a major and stay on it.
 - Redux for everything, including server data. Use a query cache.
 
 ## A reasonable Next.js project skeleton

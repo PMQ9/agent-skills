@@ -1,11 +1,11 @@
 ---
 name: hipaa-compliance
-description: Use this skill for any work touching protected health information (PHI), electronic protected health information (ePHI), patient records, clinical data, healthcare provider workflows, or systems integrating with EHRs (Epic, Cerner/Oracle Health, Athena, Meditech). Trigger when the user mentions HIPAA, HITECH, the Privacy Rule, the Security Rule, the Breach Notification Rule, the 2025 Security Rule update, business associate agreements (BAAs), minimum necessary, the 18 HIPAA identifiers, de-identification (Safe Harbor or Expert Determination), Vanderbilt University Medical Center (VUMC) data, clinical research data under a covered entity, FHIR/HL7 with patient data, sending PHI to an LLM, audit logs for PHI access, encryption requirements, breach notification timelines, or designing any system that stores, transmits, or processes patient data.
+description: Use this skill for any work touching protected health information (PHI), electronic protected health information (ePHI), patient records, clinical data, healthcare provider workflows, or systems integrating with EHRs (Epic, Cerner/Oracle Health, Athena, Meditech). Trigger when the user mentions HIPAA, HITECH, the Privacy Rule, the Security Rule, the Breach Notification Rule, the 2024-2025 Security Rule NPRM (proposed amendments, not yet final as of April 2026), business associate agreements (BAAs), minimum necessary, the 18 HIPAA identifiers, de-identification (Safe Harbor or Expert Determination), Vanderbilt University Medical Center (VUMC) data, clinical research data under a covered entity, FHIR/HL7 with patient data, sending PHI to an LLM, audit logs for PHI access, encryption requirements, breach notification timelines, or designing any system that stores, transmits, or processes patient data.
 ---
 
 # HIPAA Compliance
 
-HIPAA is the floor for handling patient data in the United States, not the ceiling. The cost of a HIPAA violation is real (civil penalties tier from $137 to $2.13M per violation category per year as of 2025; criminal penalties for willful neglect; OCR enforcement actions become public). The cost of designing for HIPAA from day one is small. The cost of retrofitting it onto an existing system is enormous and rarely complete.
+HIPAA is the floor for handling patient data in the United States, not the ceiling. The cost of a HIPAA violation is real — civil penalties tier across four culpability levels with per-violation minimums and a per-category-per-year cap, both adjusted annually for inflation under 45 CFR § 102.3 (cite the current Federal Register adjustment when quoting numbers); criminal penalties for willful neglect; OCR enforcement actions become public on the HHS Breach Portal. The cost of designing for HIPAA from day one is small. The cost of retrofitting it onto an existing system is enormous and rarely complete.
 
 This skill covers what an engineer needs to know to build, modify, or review systems that handle PHI. It is not legal advice. **For any actual compliance decision, route through your organization's HIPAA Privacy Officer, Security Officer, and counsel.** At Vanderbilt, that's VUMC Privacy Office and VUMC Information Security; the university side defers to them for clinical data.
 
@@ -48,18 +48,20 @@ The middle ground is a **Limited Data Set** — strips most identifiers but allo
 
 ## The Security Rule: technical safeguards for ePHI
 
-The 2025 update (HHS proposed in late 2024, finalized 2025) tightened many requirements that were previously "addressable" into "required." Key technical safeguards as they stand:
+**Status of the proposed update.** HHS OCR published an NPRM on December 27, 2024 proposing significant amendments to the Security Rule (45 CFR Parts 160/164) — moving many "addressable" specifications to "required," mandating MFA, encryption at rest and in transit, semi-annual vulnerability scans, annual penetration tests, technical asset inventories, and stronger contingency-plan testing. The comment period closed March 7, 2025. **As of April 2026, the final rule has not yet been published.** Treat the NPRM's requirements as best-practice baseline and as the very-likely future floor — but do not represent them to auditors as currently in force. The legally in-force Security Rule is still the 2003/2013 version.
+
+Key technical safeguards under the **in-force** Security Rule (with the NPRM direction noted where it diverges):
 
 | Safeguard | Practical implementation |
 |---|---|
 | **Access control** | Unique user IDs (no shared accounts), automatic logoff, emergency access procedure, role-based access. |
 | **Audit controls** | Log access to ePHI. Retain logs. Review them. (See `audit-logging`.) |
 | **Integrity** | Mechanisms to detect ePHI alteration or destruction. Hash, signed audit trails. |
-| **Authentication** | Verify identity before access. **MFA required** under the 2025 update for most ePHI access. |
-| **Transmission security** | Encryption in transit. TLS 1.2+ at minimum, TLS 1.3 preferred. Was "addressable," now required. |
-| **Encryption at rest** | Required under 2025 update. Was "addressable" before. |
+| **Authentication** | Verify identity before access. MFA is *addressable* under current rule; the 2024 NPRM proposes making it **required** for most ePHI access — implement MFA now regardless. |
+| **Transmission security** | Encryption in transit. TLS 1.2+ at minimum, TLS 1.3 preferred. *Addressable* under current rule; NPRM proposes making it required. |
+| **Encryption at rest** | *Addressable* under current rule; NPRM proposes making it required. Implement now regardless — the breach-safe-harbor incentive alone justifies it. |
 
-Practically, what that means for a system handling ePHI in 2026:
+Practically, what a system handling ePHI in 2026 should do (treat as required baseline whether or not the NPRM finalizes):
 
 - **TLS 1.2+ on every wire**, no exceptions. TLS 1.3 strongly preferred. No mixed-content. No HTTP redirects to HTTPS that allow MITM downgrade — HSTS preloaded.
 - **Encryption at rest** on every storage layer: database storage encryption (RDS/Aurora/Azure SQL with TDE), S3/Blob with SSE-KMS, EBS/managed disks encrypted, backups encrypted, replicas encrypted.
@@ -67,7 +69,8 @@ Practically, what that means for a system handling ePHI in 2026:
 - **MFA on all access to systems containing ePHI** — admin consoles, application logins for clinical users, API keys (or service accounts via OIDC/workload identity, not long-lived credentials), VPN, jump hosts.
 - **Unique user IDs.** No shared `clinic_admin` accounts. Federated identity (SAML/OIDC) preferred so that disabling someone in one place disables everywhere.
 - **Automatic logoff** — sessions expire after inactivity. The Security Rule doesn't specify a duration; clinical context typically uses 15-30 minutes.
-- **Comprehensive audit logging** of who accessed what when. See the `audit-logging` skill for how; the HIPAA-specific add is that audit logs are reviewed (not just stored), and retention is generally 6 years to align with HIPAA documentation retention.
+- **Comprehensive audit logging** of who accessed what when. See the `audit-logging` skill for how. HIPAA documentation retention under § 164.316(b)(2)(i) is **6 years** from creation or last effective date — that floor governs policies, risk analyses, and BAAs; the audit-log retention itself is not numerically specified, but audit logs are typically retained on the same 6-year schedule. Logs must be **reviewed**, not merely stored.
+- **Risk analysis** under § 164.308(a)(1)(ii)(A) is required *now* and the NPRM tightens cadence to annual review. Most engineering decisions (encryption choices, network segmentation, access scopes) should map to a risk-analysis line.
 
 ## Business Associate Agreements (BAAs)
 
@@ -118,8 +121,9 @@ A breach is, broadly, an unauthorized acquisition, access, use, or disclosure of
 Notification timelines:
 
 - **Affected individuals**: without unreasonable delay, no later than **60 days** from discovery.
-- **HHS**: with the individual notice if breach affects ≥ 500 individuals; otherwise annually for smaller breaches.
-- **Media**: prominent media outlet for breaches affecting ≥ 500 in a state/jurisdiction.
+- **HHS — breach affects ≥ 500 individuals**: notify **concurrently** with individual notice (within 60 days of discovery). The breach is also posted publicly on HHS's "Wall of Shame" (Breach Portal).
+- **HHS — breach affects < 500 individuals**: log internally; submit annually to HHS within 60 days of the end of the calendar year.
+- **Media**: prominent media outlet for breaches affecting ≥ 500 individuals in a state/jurisdiction, also within 60 days.
 - **Business associate to covered entity**: without unreasonable delay, **no later than 60 days** from discovery (often the BAA contractually requires faster — 30 days is common, sometimes 24-72 hours for the initial notice).
 
 There is a **safe harbor** for properly encrypted ePHI: if PHI is encrypted to NIST standards (FIPS-validated), a loss of the encrypted blob (lost laptop, stolen backup tape) is generally **not a breach**. This is the practical reason to encrypt at rest universally — it converts "we lost a laptop with patient records, now do notification" into "we lost a laptop, no breach."
@@ -200,15 +204,24 @@ A complicated area with lots of room for error. The path depends on whether the 
 
 For Vanderbilt research environments, the relevant infrastructure is typically VUMC's research data environments (VUMC-managed REDCap, the Synthetic Derivative, BioVU). These have their own access controls and data handling rules; engineering decisions there are made jointly with the research IT team and VUIIS / VICTR governance, not unilaterally.
 
+## Adjacent rules and recent rulings
+
+A few non-obvious things that affect engineering decisions in 2026:
+
+- **Reproductive-health Privacy Rule amendment (April 2024)** created a special category for reproductive-health PHI with restrictions on disclosure to law enforcement. **Vacated by the Northern District of Texas in *Texas v. HHS* (June 2025).** Code paths or BAAs that relied on those special-category protections need review with counsel — the underlying obligations have reverted to baseline Privacy Rule analysis.
+- **ONC Information Blocking Rule (21st Century Cures Act, 45 CFR Part 171).** Distinct from HIPAA but routinely entangled with it. Covered actors (providers, HIEs, certified health-IT developers) must not engage in practices that "interfere with, prevent, or materially discourage" the access, exchange, or use of electronic health information unless an exception applies. Practical effect: if you're building FHIR/EHR access flows, *not* sharing data when a request is valid is itself a regulatory risk. Plan for both directions.
+- **42 CFR Part 2** governs substance-use-disorder (SUD) treatment records held by federally-assisted SUD programs. The 2024 final rule aligned Part 2 more closely with HIPAA (allowing single consent for TPO), but Part 2 still adds restrictions on re-disclosure, requires the "Part 2 notice" on disclosed records, and has its own breach-notification posture. Behavioral-health systems at VUMC and elsewhere are commonly Part-2 covered — confirm before designing data flows.
+- **HIPAA penalty bands** are inflation-adjusted annually under 45 CFR § 102.3. Specific dollar figures change yearly; the structure is four culpability tiers with per-violation minimums and a per-category-per-year cap. Cite current Federal Register adjustment when quoting numbers.
+
 ## State law layering
 
 HIPAA preempts contrary state law unless the state law is more stringent. Several states have enacted stricter rules:
 
 - **California (CMIA)** — broader than HIPAA in some respects.
 - **Texas, New York, Washington** — various more-stringent provisions.
-- **Tennessee** — generally aligned with HIPAA, with some additions for behavioral health.
+- **Tennessee** — Tennessee Identity Theft Deterrence Act and Tennessee Data Breach Notification Law (T.C.A. § 47-18-2107) layer a 45-day breach-notice clock that may be shorter than HIPAA's 60 days; behavioral-health additions also apply. Both relevant for VU/VUMC.
 
-Special-protected categories often have stricter rules — substance use disorder records (42 CFR Part 2), mental health, HIV status, genetic information (GINA). If your data includes these, get specific guidance.
+Special-protected categories often have stricter rules — substance use disorder records (42 CFR Part 2, see above), mental health, HIV status, genetic information (GINA). If your data includes these, get specific guidance.
 
 ## A reasonable architecture for a HIPAA-handling service
 
@@ -248,7 +261,7 @@ Implementation specifics depend on your stack; the structure is universal.
 
 The Security Rule requires written policies and procedures. From an engineering standpoint, the artifacts that matter:
 
-- **Risk analysis** — current and reviewed regularly. The 2025 update emphasizes this. It's not paperwork; it's the input to the security plan.
+- **Risk analysis** — current and reviewed regularly. The 2024 NPRM proposes annual review explicitly; the in-force rule already requires it on a "regular" basis. It's not paperwork; it's the input to the security plan.
 - **Security plan / safeguard documentation.**
 - **Incident response plan** — including breach notification.
 - **Access management procedures** — provisioning, review, deprovisioning.

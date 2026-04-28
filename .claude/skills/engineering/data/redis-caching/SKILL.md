@@ -9,9 +9,20 @@ A Redis is a fast, in-memory data structure server you can talk to over the netw
 
 ## The licensing landscape (2026 context)
 
-In 2024 Redis Inc. relicensed Redis 7.4+ to a source-available license (RSAL/SSPL dual), prompting the community to fork. The Linux Foundation backed **Valkey**, which is the BSD-licensed continuation most clouds and distros now ship by default (AWS ElastiCache and MemoryDB offer Valkey; Azure Cache for Redis remained Redis through Microsoft's separate agreement). **KeyDB** (multithreaded) and **Dragonfly** (different architecture, Redis-compatible wire protocol) are also viable.
+In **March 2024** Redis Inc. relicensed Redis 7.4 (the last open-source Redis) under a source-available dual license (RSALv2 / SSPLv1). The Linux Foundation responded by launching **Valkey** (BSD-3) as a community fork; **Valkey 8.0 GA shipped September 2024** with multithreaded I/O and a native Bloom filter module, and Valkey is now the default Redis-compatible offering on most Linux distros and on AWS.
 
-For new projects: **Valkey is the safest default** unless you specifically need a Redis Inc. enterprise feature. The wire protocol and command set are compatible. Code in this document calls "Redis" but applies to all of them.
+Then in **May 2024** Redis Inc. itself added an **AGPLv3** option starting with **Redis 8.0**, returning the upstream Redis line to an OSI-approved open-source license. So as of 2026 there are two viable open-source paths — Valkey (BSD) and Redis 8+ (AGPL/RSAL/SSPL tri-license) — plus the older source-available-only Redis 7.4. Valkey and Redis are wire-compatible and command-compatible at the layer most apps care about.
+
+Cloud landscape:
+
+- **AWS**: **ElastiCache for Valkey** (GA 2024) is roughly **~33% cheaper** than ElastiCache for Redis on equivalent node families and is AWS's recommended default for new clusters; ElastiCache for Redis OSS still supported. **MemoryDB for Valkey** likewise.
+- **Azure**: **Azure Managed Redis** (Redis Inc. partnership) remains the primary Microsoft-supported managed offering.
+- **GCP**: **Memorystore** offers both Redis and Valkey.
+- **Upstash, Dragonfly Cloud** continue serverless / alternative-engine options.
+
+**KeyDB** (multithreaded, BSD) and **Dragonfly** (different architecture, Redis-compatible wire protocol, BSL→AGPL) remain viable when their specific characteristics matter.
+
+For new projects: **Valkey 8+ is the safest default** unless you specifically need a Redis Inc. enterprise feature; the AGPL terms of Redis 8 are fine for most server-side deployments but warrant a license review for vendor distributions. The wire protocol and command set are compatible across all of these. Code in this document calls "Redis" but applies to all of them.
 
 ## When Redis is the right answer
 
@@ -295,6 +306,36 @@ Critical caveats:
 - **Redlock** (Antirez's algorithm using N independent Redis nodes) addresses some of this, but Martin Kleppmann's analysis showed it's not safe under all GC/network assumptions. For correctness-critical locking, Redis is rarely the right tool — use Postgres advisory locks, Zookeeper, or etcd.
 - For "best-effort" coordination (avoid duplicate work most of the time), a Redis lock is fine. For "guarantee mutual exclusion always," it isn't.
 
+### Fencing tokens — the correctness fix Kleppmann recommends
+
+If you must use a Redis-style lock for correctness-relevant work, pair it with a **fencing token**: a monotonically increasing number issued by the lock service, attached to every write to the protected resource. The protected resource (DB, file store, etc.) refuses any write whose token is lower than the highest token it has previously seen. A lock holder that GC-pauses past its TTL and tries to write later finds its token rejected.
+
+```lua
+-- acquire returns a fencing token; bump-on-acquire counter is in Redis.
+-- KEYS[1] = lock key, KEYS[2] = fencing counter key
+-- ARGV[1] = client token (UUID), ARGV[2] = lock TTL ms
+if redis.call("SET", KEYS[1], ARGV[1], "NX", "PX", tonumber(ARGV[2])) then
+  return redis.call("INCR", KEYS[2])   -- the fence
+else
+  return -1                            -- not acquired
+end
+```
+
+```python
+fence = acquire_lock("lock:resource:42", lock_ttl_ms=30000)
+if fence < 0: raise CouldNotAcquire()
+# include `fence` in every protected write; resource enforces monotonic fence.
+db.execute(
+    "UPDATE resource SET value = %s, last_fence = %s "
+    "WHERE id = %s AND last_fence < %s",
+    [new_value, fence, 42, fence],
+)
+```
+
+The fence is what makes the lock safe under pauses, network partitions, and TTL drift — not the lock itself. Without it, any TTL-based lock is best-effort. With it, you don't strictly need the lock to be correct, only fast/coordinative.
+
+For locking that's already correctness-safe out of the box (no fence required), Postgres `SELECT FOR UPDATE` / advisory locks, Zookeeper, or etcd remain the right tools.
+
 ## Rate limiting
 
 ### Fixed window (cheapest, has burst issue)
@@ -342,10 +383,13 @@ local elapsed = math.max(0, tonumber(ARGV[3]) - ts)
 tokens = math.min(tonumber(ARGV[1]), tokens + elapsed * tonumber(ARGV[2]))
 local allowed = tokens >= tonumber(ARGV[4])
 if allowed then tokens = tokens - tonumber(ARGV[4]) end
-redis.call("HMSET", KEYS[1], "tokens", tokens, "ts", ARGV[3])
+-- HSET supports multi field/value pairs since Redis 4.0; HMSET is deprecated.
+redis.call("HSET", KEYS[1], "tokens", tokens, "ts", ARGV[3])
 redis.call("EXPIRE", KEYS[1], 3600)
 return allowed and 1 or 0
 ```
+
+For new code, prefer **Redis Functions** (Redis 7+) over `EVAL`/`SCRIPT LOAD` — they're versioned, named, persisted with the dataset, and survive restarts/replicas without re-loading.
 
 For most applications, use a library (`redis-cell` module, `node-rate-limiter-flexible`, `slowapi`) instead of writing this yourself.
 
