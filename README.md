@@ -26,7 +26,9 @@ Picking rules:
 |---|---|---|
 | backend-development | [.claude/skills/engineering/backend/backend-development/SKILL.md](.claude/skills/engineering/backend/backend-development/SKILL.md) | General backend service work below the controller — data access, caching, async/jobs, transactions, config, secrets, logging, retries, idempotency, feature flags, testing strategy. |
 | fastapi | [.claude/skills/engineering/backend/fastapi/SKILL.md](.claude/skills/engineering/backend/fastapi/SKILL.md) | Python FastAPI services — project structure, DI, Pydantic, async SQLAlchemy/SQLModel, auth, background work, testing, observability. |
+| django | [.claude/skills/engineering/backend/django/SKILL.md](.claude/skills/engineering/backend/django/SKILL.md) | Django / DRF — models, migrations, querysets, serializers, admin, URL routing, auth, signals, Channels, Celery, async views, ORM performance, testing with pytest-django. |
 | nodejs-backend | [.claude/skills/engineering/backend/nodejs-backend/SKILL.md](.claude/skills/engineering/backend/nodejs-backend/SKILL.md) | Node.js / TypeScript backends — Fastify, Hono, Express, NestJS; Zod validation; Drizzle, Prisma; async error handling; auth; testing. |
+| go-backend | [.claude/skills/engineering/backend/go-backend/SKILL.md](.claude/skills/engineering/backend/go-backend/SKILL.md) | Go services — net/http, chi/echo/gin/fiber, goroutines, channels, context, error wrapping, database/sql/sqlx/sqlc/pgx/GORM, slog, table-driven tests, pprof. |
 
 ### Engineering / Data
 
@@ -56,6 +58,20 @@ Picking rules:
 | Skill | Path | Use when |
 |---|---|---|
 | devops-cicd | [.claude/skills/engineering/devops/devops-cicd/SKILL.md](.claude/skills/engineering/devops/devops-cicd/SKILL.md) | CI/CD pipelines (GitHub Actions, GitLab CI, Buildkite, Jenkins), Dockerfiles, deploy strategies (rolling/blue-green/canary), artifact registries, image signing, supply-chain security, branch protection. |
+| kubernetes-helm-gitops | [.claude/skills/engineering/devops/kubernetes-helm-gitops/SKILL.md](.claude/skills/engineering/devops/kubernetes-helm-gitops/SKILL.md) | Kubernetes manifests (Deployments/StatefulSets/Jobs), Helm charts, Argo CD / Flux, HPA/VPA/PDB, RBAC, network policies, ingress, debugging stuck rollouts and CrashLoopBackOff. |
+
+### Engineering / Reliability
+
+| Skill | Path | Use when |
+|---|---|---|
+| observability | [.claude/skills/engineering/reliability/observability/SKILL.md](.claude/skills/engineering/reliability/observability/SKILL.md) | Logs, metrics, traces, alerts, dashboards, SLIs/SLOs/error budgets — OpenTelemetry, Prometheus, Grafana/Loki/Tempo, Jaeger, Datadog, Honeycomb, structured logging, cardinality. |
+| resilience-patterns | [.claude/skills/engineering/reliability/resilience-patterns/SKILL.md](.claude/skills/engineering/reliability/resilience-patterns/SKILL.md) | Behavior under failure — timeouts, retries, backoff/jitter, circuit breakers, bulkheads, rate limiting, load shedding, idempotency, graceful degradation, queues/back-pressure, sagas, DLQs. |
+
+### Engineering / Security
+
+| Skill | Path | Use when |
+|---|---|---|
+| secrets-management | [.claude/skills/engineering/security/secrets-management/SKILL.md](.claude/skills/engineering/security/secrets-management/SKILL.md) | Storing, fetching, rotating secrets — Vault, AWS Secrets Manager/SSM, GCP Secret Manager, Azure Key Vault, KMS, SOPS, Sealed Secrets, External Secrets Operator, IRSA/Workload Identity, mTLS. |
 
 ## Adding a new skill
 

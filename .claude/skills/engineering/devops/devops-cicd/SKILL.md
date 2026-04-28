@@ -260,7 +260,8 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::...:role/ci-deployer
           aws-region: us-east-1
-      - uses: docker/build-push-action@v5
+      - id: build
+        uses: docker/build-push-action@v5
         with:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}

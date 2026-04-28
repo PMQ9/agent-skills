@@ -139,7 +139,7 @@ Quick estimates that catch most bad decisions:
 - A modern Postgres on decent hardware handles **5K–20K simple queries/sec** comfortably. If your projected load is below that, you don't need sharding.
 - A single backend instance handles **a few thousand concurrent connections** with async I/O (FastAPI, Node, Go) or **hundreds** with thread-per-request (sync Python/Ruby).
 - A Kafka partition processes **~10K msg/sec** comfortably. Plan partitions for both throughput and parallelism of consumers.
-- p99 of N independent calls each at p99=X is roughly **X × log(N) / log(2)** when N is small. Fan-out kills tail latency.
+- Fan-out kills tail latency: if a request makes N independent calls each with p99 latency X, the chance *all* finish under X is `0.99^N` — by N≈69 you're at 50/50, so the request's effective p99 is well past X. Cut N, hedge requests, or relax the percentile.
 - **Network call ≈ 1ms in-DC, 10–100ms cross-region.** Memory access ≈ 100ns. Disk read ≈ 0.1–10ms. Keep the orders of magnitude in your head.
 
 ## Communicating architecture
