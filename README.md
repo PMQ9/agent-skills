@@ -82,6 +82,7 @@ Picking rules:
 | Skill | Path | Use when |
 |---|---|---|
 | ferpa-compliance | [.claude/skills/engineering/compliance/ferpa-compliance/SKILL.md](.claude/skills/engineering/compliance/ferpa-compliance/SKILL.md) | FERPA rules for student data — education records, directory info, parent/guardian access, SIS/registrar data, rosters, grades, advising, vendor disclosures. |
+| vanderbilt-data-classification | [.claude/skills/engineering/compliance/vanderbilt-data-classification/SKILL.md](.claude/skills/engineering/compliance/vanderbilt-data-classification/SKILL.md) | Vanderbilt's L1–L4 data classification + approved-AI-tool matrix (ChatGPT Edu / Amplify / Copilot), masking/redaction before LLM calls, M365 sensitivity labels, when to escalate to Cybersecurity. |
 
 ### Engineering / AI
 
