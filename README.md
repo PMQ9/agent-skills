@@ -69,6 +69,12 @@ Picking rules:
 | devops-cicd | [.claude/skills/engineering/devops/devops-cicd/SKILL.md](.claude/skills/engineering/devops/devops-cicd/SKILL.md) | CI/CD pipelines (GitHub Actions, GitLab CI, Buildkite, Jenkins), Dockerfiles, deploy strategies (rolling/blue-green/canary), artifact registries, image signing, supply-chain security, branch protection. |
 | kubernetes-helm-gitops | [.claude/skills/engineering/devops/kubernetes-helm-gitops/SKILL.md](.claude/skills/engineering/devops/kubernetes-helm-gitops/SKILL.md) | Kubernetes manifests (Deployments/StatefulSets/Jobs), Helm charts, Argo CD / Flux, HPA/VPA/PDB, RBAC, network policies, ingress, debugging stuck rollouts and CrashLoopBackOff. |
 
+### Engineering / Testing
+
+| Skill | Path | Use when |
+|---|---|---|
+| integration-testing | [.claude/skills/engineering/testing/integration-testing/SKILL.md](.claude/skills/engineering/testing/integration-testing/SKILL.md) | Writing or running integration tests — pytest, Jest/Vitest; testcontainers for real Postgres/Redis/Kafka; MSW / pytest-httpx for stubbing third-party APIs; transactional rollback for isolation; debugging flaky-in-CI tests; deciding what to mock vs run real. |
+
 ### Engineering / Reliability
 
 | Skill | Path | Use when |
