@@ -1,0 +1,274 @@
+# OpenAPI 3.1 starter — drop in and adapt.
+# Includes: cursor pagination envelope, RFC 7807 problem+json errors,
+# BearerAuth (JWT), and a baseline 4xx response catalog wired up via $ref
+# so every endpoint inherits a consistent error shape.
+#
+# Validate locally:  npx @redocly/cli lint openapi.yaml
+# Mock locally:      npx @stoplight/prism-cli mock openapi.yaml
+#
+# Adapted from https://github.com/Jeffallan/claude-skills (MIT).
+
+openapi: "3.1.0"
+info:
+  title: Example API
+  version: "1.0.0"
+  description: |
+    Replace this with a one-paragraph summary of what the API does and who calls it.
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production
+  - url: https://api-staging.example.com/v1
+    description: Staging
+
+tags:
+  - name: Users
+
+paths:
+  /users:
+    get:
+      summary: List users
+      operationId: listUsers
+      tags: [Users]
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+          description: Opaque cursor for pagination. Echo the value of `pagination.next_cursor` from the previous response.
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+        - name: sort
+          in: query
+          schema: { type: string, default: "-created_at" }
+          description: Comma-separated. Leading `-` is descending. Allowed fields documented per endpoint.
+      responses:
+        "200":
+          description: Paginated list of users
+          headers:
+            ETag:
+              schema: { type: string }
+            RateLimit-Limit:
+              schema: { type: integer }
+            RateLimit-Remaining:
+              schema: { type: integer }
+            RateLimit-Reset:
+              schema: { type: integer }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/User" }
+                  pagination:
+                    $ref: "#/components/schemas/CursorPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+    post:
+      summary: Create a user
+      operationId: createUser
+      tags: [Users]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string, format: uuid }
+          description: Client-generated UUID per logical operation. Same key on retries; new key for new operations.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserCreate" }
+      responses:
+        "201":
+          description: User created
+          headers:
+            Location:
+              schema: { type: string }
+              description: URI of the created user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/UnprocessableEntity" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /users/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+
+    get:
+      summary: Get a user
+      operationId: getUser
+      tags: [Users]
+      responses:
+        "200":
+          description: User found
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "304": { description: Not Modified (If-None-Match matched) }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    patch:
+      summary: Update a user
+      operationId: updateUser
+      tags: [Users]
+      parameters:
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string }
+          description: ETag from a prior GET; required for optimistic concurrency.
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: "#/components/schemas/UserUpdate" }
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
+        "422": { $ref: "#/components/responses/UnprocessableEntity" }
+
+    delete:
+      summary: Delete a user
+      operationId: deleteUser
+      tags: [Users]
+      responses:
+        "204": { description: User deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  schemas:
+    User:
+      type: object
+      required: [id, email, created_at]
+      properties:
+        id:         { type: string, format: uuid, readOnly: true }
+        email:      { type: string, format: email }
+        name:       { type: string, nullable: true }
+        status:     { type: string, enum: [active, suspended, deleted], readOnly: true }
+        created_at: { type: string, format: date-time, readOnly: true }
+        updated_at: { type: string, format: date-time, readOnly: true }
+
+    UserCreate:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+        name:  { type: string }
+
+    UserUpdate:
+      type: object
+      properties:
+        email: { type: string, format: email }
+        name:  { type: string, nullable: true }
+
+    CursorPage:
+      type: object
+      required: [next_cursor, has_more]
+      properties:
+        next_cursor: { type: string, nullable: true }
+        has_more:    { type: boolean }
+
+    Problem:
+      # RFC 7807 Problem Details for HTTP APIs.
+      # Always served with Content-Type: application/problem+json.
+      type: object
+      required: [type, title, status]
+      properties:
+        type:     { type: string, format: uri, example: "https://api.example.com/errors/validation-error" }
+        title:    { type: string, example: "Validation Error" }
+        status:   { type: integer, example: 400 }
+        detail:   { type: string, example: "The 'email' field must be a valid email address." }
+        instance: { type: string, example: "/requests/req-abc123" }
+        code:     { type: string, example: "validation_error" }
+        trace_id: { type: string, example: "01HXYZ..." }
+        errors:
+          type: array
+          description: Field-level details for validation problems.
+          items:
+            type: object
+            required: [field, code]
+            properties:
+              field:   { type: string }
+              code:    { type: string }
+              message: { type: string }
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+    Conflict:
+      description: Conflict with current state (e.g., duplicate, illegal transition)
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+    UnprocessableEntity:
+      description: Semantic validation failed
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+    PreconditionFailed:
+      description: ETag in If-Match did not match current resource state
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        Retry-After: { schema: { type: integer } }
+        RateLimit-Limit: { schema: { type: integer } }
+        RateLimit-Remaining: { schema: { type: integer } }
+        RateLimit-Reset: { schema: { type: integer } }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []
