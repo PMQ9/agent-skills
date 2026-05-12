@@ -13,6 +13,12 @@ Picking rules:
 
 ## Catalog
 
+### Engineering / Requirements
+
+| Skill | Path | Use when |
+|---|---|---|
+| requirements-analyst | [.claude/skills/engineering/requirements/requirements-analyst/SKILL.md](.claude/skills/engineering/requirements/requirements-analyst/SKILL.md) | Turning a vague feature ask into a written spec — problem, users, inputs/outputs, constraints, acceptance criteria, open questions. Always run this before system-architecture or test-planning when the request is fresh. |
+
 ### Engineering / Architecture
 
 | Skill | Path | Use when |
@@ -74,6 +80,7 @@ Picking rules:
 
 | Skill | Path | Use when |
 |---|---|---|
+| test-planning | [.claude/skills/engineering/testing/test-planning/SKILL.md](.claude/skills/engineering/testing/test-planning/SKILL.md) | Designing a test plan from acceptance criteria — happy paths, edge cases, negative tests, layer selection (unit/integration/e2e/manual), coverage matrix. Run before writing tests; complements integration-testing (which handles the implementation). |
 | integration-testing | [.claude/skills/engineering/testing/integration-testing/SKILL.md](.claude/skills/engineering/testing/integration-testing/SKILL.md) | Writing or running integration tests — pytest, Jest/Vitest; testcontainers for real Postgres/Redis/Kafka; MSW / pytest-httpx for stubbing third-party APIs; transactional rollback for isolation; debugging flaky-in-CI tests; deciding what to mock vs run real. |
 
 ### Engineering / Reliability

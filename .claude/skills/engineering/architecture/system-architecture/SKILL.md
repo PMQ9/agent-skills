@@ -7,6 +7,22 @@ description: Architectural reasoning, decision-making, and system design for bac
 
 Architectural decisions are expensive to reverse. The job of this skill is to slow down enough to choose deliberately, write the choice down, and avoid the common failure modes — premature distribution, anemic domain models, leaky abstractions, and big-bang rewrites.
 
+## Before you architect anything
+
+Read the spec directory at `docs/requirements/<slug>/`: start with `_overview.md` for narrative, then read each category file (`functional.md`, `security.md`, `performance.md`, `availability.md`, `compliance.md`, ...) relevant to the architectural choice. Cross-cutting policy files cited from the spec (`_policies/<slug>.md`) are mandatory reading when the spec inherits them. The shared docs convention at `.claude/references/docs-convention.md` defines the typed-ID system. Architectural decisions are inputs to traceable artifacts (ADRs) that cite specific requirement IDs from the spec's category files. The question this skill answers is always "given these requirements, what should the system look like?" — not "what's a reasonable architecture in general?"
+
+**Gate check before producing an ADR:**
+
+- The spec directory exists; the category files relevant to your decision exist (e.g., if you're making a security architecture call, `security.md` exists and has accepted SEC-NNN requirements).
+- The requirements you're about to decide for have unambiguous Statements, Rationale, and ACs, with `Status: Accepted`.
+- NFR requirements (PERF-NNN, AVAIL-NNN, SEC-NNN, COMP-NNN, A11Y-NNN) are stated with numbers, not adjectives.
+- Inherited policy references resolve to existing policy files with the cited REQ-IDs.
+- Open Questions in `_overview.md` that would change the architecture are resolved, or you're explicitly architecting around the uncertainty (which itself becomes an ADR — "we will design for the worst-case answer to Q-3 because resolving Q-3 takes weeks").
+
+If the spec is missing and the request is non-trivial — anything beyond "should this controller method be async" — back up and run the **requirements-analyst** skill first. A 30-minute requirements pass saves the day-long architecture debate that follows from a vague ask. The extraction questions later in this skill overlap heavily with the spec sheet's content; the answers belong in a written spec, not in chat.
+
+For small in-the-flow questions (a single pattern choice, a yes/no on a library, a comparison between two services with no downstream consequences), skip the spec and answer directly. Use judgment about the cost of being wrong.
+
 ## Core operating principles
 
 **Optimize for change, not perfection.** Most production systems are wrong about something within 18 months. The right architecture is the one that makes the inevitable wrong assumptions cheap to fix. Favor reversibility over correctness.
@@ -83,31 +99,59 @@ When you say "scalable" or "reliable," pin it down. These are the attributes wor
 
 ## Architecture Decision Records (ADRs)
 
-Every non-trivial architectural choice deserves a one-page ADR, committed alongside code. Format:
+Every non-trivial architectural choice produces an ADR, committed alongside code, citing the REQ-IDs from the spec sheet that motivate the decision. ADRs are **append-only**: once accepted, you don't rewrite an ADR; you write a new one that supersedes it.
+
+**File convention.** Save ADRs to `docs/adr/NNNN-<short-slug>.md`. NNNN is a zero-padded, four-digit, monotonically increasing number scoped to the project — pick the next unused number by listing `docs/adr/`. The slug is kebab-case and short: `0007-use-postgres-jsonb-not-mongo.md`. Never reuse a number; mark a superseded ADR's status as `Superseded by ADR-NNNN` and leave the original document intact.
+
+**Linkage — bidirectional and by ID.**
+
+- Each ADR opens with `Addresses: <spec-slug>#FN-NNN[, ...]` (typed IDs from the spec's category files — FN, SEC, PERF, AVAIL, COMP, UX, A11Y, SAF, CON, or policy citations like `_policies/<slug>#SEC-NNN`). An ADR with no `Addresses` line is either decorating a decision that needed no record or revealing a missing requirement that should be added to the spec first.
+- After saving the ADR, append `- ADR-NNNN — <title>` to `_overview.md`'s project-level `Linked artifacts` section, and append `- ADR-NNNN` to the per-requirement `Linked artifacts` block in each category file for every requirement the ADR addresses.
+- A reader can therefore go: spec sheet → list of ADRs that touch each REQ → individual ADR with full rationale; or in the reverse direction: ADR → list of REQs it addresses → spec sheet entries with full context.
+
+**When to write one.** Anytime you'd struggle to defend the choice to a thoughtful colleague six months later. New language, new datastore, new infra primitive, a non-obvious pattern (CQRS, event sourcing, sagas), a deliberate departure from the existing house style. Reversible micro-choices (which logging library) usually don't need one; if you'd hate to revisit it, write the ADR.
+
+**When the decision invalidates a REQ.** An architecture pass sometimes reveals that a REQ is impossible, contradictory, or far more expensive than the requester realized. The right move is to surface this back to requirements-analyst before writing the ADR — the spec may need to supersede a requirement (e.g., PERF-001 → PERF-002) or add a Note before the architecture decision is meaningful. Don't quietly architect around a broken requirement.
+
+Format:
 
 ```markdown
 # ADR-NNNN: [Title — what is being decided]
 
-## Status
-[Proposed | Accepted | Superseded by ADR-XXXX]
+**Addresses:** <spec-slug>#FN-NNN, <spec-slug>#SEC-NNN, <spec-slug>#PERF-NNN, ...
+**Status:** Proposed | Accepted | Superseded by ADR-NNNN | Withdrawn
+**Author:** <name or role>
+**Decided:** YYYY-MM-DD
 
 ## Context
+
 What's the situation? What forces are at play? What constraints exist? What evidence
-do we have? Be concrete — include numbers, not adjectives.
+do we have? Be concrete — include numbers, not adjectives. Quote the REQs you're
+addressing where useful; restating them in your own words risks drift.
 
 ## Decision
+
 What did we decide? State it as a directive: "We will use X."
 
 ## Consequences
+
 What becomes easier? What becomes harder? What did we give up? What's the exit
-strategy if this turns out wrong?
+strategy if this turns out wrong? Which REQ-IDs are satisfied by this decision, and
+which become harder to satisfy?
 
 ## Alternatives considered
+
 Each alternative, briefly, and why it was rejected. This is the most valuable
 section for future readers — it preserves the thinking.
+
+## Notes
+
+(Optional, append-only. For retroactive context — e.g., "2026-06-01: discovered
+that REQ-014 supersedes REQ-007; this ADR's rationale still applies because
+both versions require sub-second response. Reviewed and confirmed.")
 ```
 
-Write the ADR *before* implementing. If you can't articulate the alternatives and why they lost, you don't understand the decision well enough to make it.
+Write the ADR *before* implementing. If you can't articulate the alternatives and why they lost, you don't understand the decision well enough to make it. If you can't list the REQ-IDs the decision addresses, the decision is happening at the wrong level.
 
 ## Anti-patterns to flag immediately
 
@@ -154,14 +198,18 @@ Avoid: 50-box "everything we have" diagrams. Nobody reads them. Pick an audience
 
 ## A practical workflow for greenfield design
 
-1. Write the **non-functional requirements** first: scale, latency, availability, consistency, compliance. Numbers, not adjectives.
-2. Sketch the **domain model** — the nouns and verbs of the business, ignoring tech.
-3. Identify **bounded contexts** and how data flows between them.
-4. Pick the **simplest topology** that satisfies the NFRs (almost always: monolith + Postgres + queue).
-5. Identify the **two or three biggest risks** (the highest-load path, the strongest consistency requirement, the most external integrations) and design those carefully.
-6. Write **ADRs** for the choices you made, including the ones you rejected.
-7. Build a **walking skeleton** — end-to-end thin slice through every layer — before filling in features. Proves the architecture works.
-8. **Measure as you go.** Add observability before you need it; you can't tune what you can't see.
+1. **Read the requirements doc** if one exists. If not and the work is non-trivial, write one first (requirements-analyst skill). The rest of this workflow assumes you can quote acceptance criteria and constraints, not paraphrase them.
+2. **Pin the non-functional requirements** — scale, latency, availability, consistency, compliance. Numbers, not adjectives. If the requirements doc doesn't have these, that's the first gap to surface.
+3. **Sketch the domain model** — the nouns and verbs of the business, ignoring tech. Names, states, transitions between states, invariants.
+4. **Identify bounded contexts** and how data flows between them. This is where you decide whether something is one service or several.
+5. **Component breakdown.** For each bounded context, name the components (HTTP service, worker, scheduler, database, queue, cache, external integration) and the responsibility of each in one line. Draw the dependency arrows: who calls whom, who owns what data. The output is small enough to fit on one page — if it isn't, you're at the wrong altitude.
+6. **Pick the simplest topology** that satisfies the NFRs (almost always: monolith + Postgres + queue). State the topology choice as a directive ("we will start with a modular monolith on Postgres + a Redis-backed queue") and the deviation triggers ("split when single-instance write throughput exceeds N").
+7. **Identify the two or three biggest risks** — the highest-load path, the strongest consistency requirement, the most external integrations — and design those carefully. The rest can be sketched.
+8. **Write ADRs** for the choices that aren't obvious, including the alternatives you rejected and why. File them to `docs/adr/NNNN-<slug>.md` and link each one from the relevant requirements doc.
+9. **Build a walking skeleton** — end-to-end thin slice through every layer — before filling in features. Proves the architecture works under the real wiring, not in isolation.
+10. **Measure as you go.** Add observability before you need it; you can't tune what you can't see.
+
+The deliverables of this workflow are concrete: an updated requirements doc (with any newly surfaced constraints), one or more ADRs, and a component diagram or component list. Architecture that lives only in chat evaporates the moment context resets.
 
 ## Things to push back on
 
