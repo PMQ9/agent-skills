@@ -7,6 +7,66 @@ description: Use this skill for any work involving CI/CD pipelines, build system
 
 The job of CI/CD is to give your team confidence that the code on `main` is shippable, and to ship it with the smallest possible distance between "merge" and "in production." Every minute added to that distance compounds across every change for the lifetime of the system.
 
+## Inputs from upstream work — and the gate
+
+A pipeline doesn't exist in isolation. Read the spec sheet and the relevant ADRs before committing to a design. Every non-trivial pipeline choice should be defensible by citation: "we deploy on every merge because <spec-slug>#REQ-004 commits to daily delivery; we use blue/green because ADR-0007 mandates instant rollback."
+
+**Gate check before designing a pipeline:**
+
+- The spec has at least one operational requirement in `availability.md`, `performance.md`, `security.md`, or `compliance.md` — deploy frequency, downtime budget, rollback target, audit retention, change failure rate, or similar.
+- NFR requirements that constrain the pipeline (RPO/RTO, compliance regimes, geographical constraints) are stated with numbers.
+- Existing ADRs that govern the pipeline (image digests, signing requirements, queue choice, topology) are read and respected.
+
+If none of those are written down and the choice isn't obvious, back up. A one-paragraph addition to the spec sheet costs less than the rework when the team realizes the pipeline targets daily deploys for a system whose spec implies quarterly.
+
+What to check:
+
+- **`docs/requirements/<slug>/`** — the spec directory. For pipeline design, the relevant category files are usually `availability.md` (AVAIL-NNN — uptime, RTO, RPO, deploy frequency), `performance.md` (PERF-NNN — perf budgets that the pipeline must validate before promotion), `security.md` (SEC-NNN — signing, scanning, image-provenance requirements), `compliance.md` (COMP-NNN — audit log retention, evidence requirements).
+- **Inherited policies in `docs/requirements/_policies/`** — org-wide SLAs and security baselines apply across features. Cite them by ID.
+- **`docs/adr/`** — architecture decisions that constrain the pipeline. An ADR mandating immutable image digests, multi-region deploys, signed images, or specific compliance evidence is a non-negotiable input.
+- **Existing pipelines in the repo** — the *house style* matters. A team running GitHub Actions everywhere will not thank you for a Buildkite migration unless it's been agreed in an ADR.
+
+## Runbooks: traceable operational docs
+
+For deploys, rollbacks, and recurring on-call procedures that aren't fully automated, write a runbook to `docs/runbooks/<slug>.md`. Each runbook cites the REQs and ADRs it implements at the top:
+
+```markdown
+# Runbook: <procedure title>
+
+**Implements:** <spec-slug>#AVAIL-NNN, <spec-slug>#COMP-NNN (or `_policies/uptime-sla#AVAIL-NNN`)
+**Per:** ADR-NNNN, ADR-NNNN
+**Owner:** <on-call rotation or role>
+**Last reviewed:** YYYY-MM-DD
+
+## When to use this runbook
+<Trigger conditions — alert names, customer-reported symptoms, scheduled times.>
+
+## Procedure
+<Numbered steps. Exact commands. Expected output for each step.>
+
+## What to do if a step fails
+<Branching guidance per step.>
+
+## Recovery
+<How to roll back or restore. Citation to the relevant ADR if the rollback strategy is non-obvious.>
+
+## Notes
+(Append-only, dated. For retroactive context: "2026-06-12 — discovered step 4
+fails when X is true; added pre-check.")
+```
+
+A runbook earns its place when:
+
+- A procedure requires human steps in a specific order, and getting the order wrong has a cost.
+- The on-call person at 3am won't have time to read source code to figure out the next move.
+- A regulator or auditor asks for documented operational procedures.
+
+A runbook that doesn't cite requirements or ADRs is either solving a problem nobody wrote down (back up and write the REQ), or it's ad-hoc institutional knowledge (write an ADR, then write the runbook).
+
+Skip the runbook when the procedure is fully automated and the automation is the documentation. Better one well-maintained runbook than ten stale ones.
+
+After saving a runbook, append `- Runbook: docs/runbooks/<slug>.md` to the relevant spec sheet's `Linked artifacts`.
+
 ## The pipeline as a contract
 
 A CI/CD pipeline is a contract: *if this passes, this artifact is safe to deploy.* That means:

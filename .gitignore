@@ -1,9 +1,19 @@
 .claude/settings.json
 .DS_Store
+.gitignore
+
+# Per-skill workspace artifacts from skill development / eval runs
 .claude/skills/engineering/backend/**/*.json
 .claude/skills/engineering/backend/api-design-workspace/**/*.md
 .claude/skills/engineering/backend/api-design-workspace/**/*.html
 .claude/skills/engineering/backend/api-design-workspace/iteration-2/grade.py
 .claude/skills/engineering/backend/api-design-workspace/iteration-2/build_viewer.py
 .claude/skills/engineering/backend/api-design-workspace/iteration-3/
-.gitignore
+
+# Repo-root skill-review artifacts (regenerated each iteration)
+skill-review*.html
+skill-review-outputs/
+SKILL-SUITE-CHANGES.md
+
+# Built .skill packages (derived from SKILL.md sources)
+*.skill

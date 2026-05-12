@@ -7,6 +7,33 @@ description: Use this skill for any backend service work — application archite
 
 A backend service is a long-running program that holds state on behalf of users. Most of the bugs that matter come from three places: shared mutable state, distributed-systems failure modes you didn't plan for, and data access that worked fine on a developer laptop but melts under load. This skill is about avoiding those.
 
+## Before writing code: read what's been decided, and cite by ID
+
+For non-trivial features, before opening an editor:
+
+1. Read **`docs/requirements/<slug>/`** — start with `_overview.md` for narrative; then read each category file relevant to your implementation (`functional.md`, `security.md`, `performance.md`, etc.). Inherited policies in `_policies/` are mandatory reading. Implementing against a verbal description means re-deriving requirements in code, which means the requirements drift from intent without anyone noticing.
+2. Read **`docs/test-plans/<slug>.md`** — what cases must the implementation handle? The test plan is the inverted shape of the implementation: every case it lists is a code path you need.
+3. Read the relevant **ADRs in `docs/adr/`** — what constraints have already been chosen? A new feature implemented with a different framework, ORM, or queue than the existing house style is a surprise nobody wanted.
+
+**Gate check before non-trivial code:**
+
+- The spec directory exists and the typed requirements you're implementing (FN-NNN, SEC-NNN, PERF-NNN, ...) are `Accepted`.
+- The test plan covers those requirement IDs in its coverage matrix.
+- ADRs governing the implementation choices (framework, datastore, queue, auth approach) exist or are obvious from the existing codebase.
+- Inherited `_policies/` files exist and have their own tests.
+
+If any of those are missing for a non-trivial change, surface it before coding — back up to the relevant skill (requirements-analyst, test-planning, system-architecture). Implementing against guesses produces code whose `why` lives only in someone's head.
+
+**Citation in code.** When the trace would otherwise be invisible to a future reader, cite by typed ID:
+
+- Commit messages and PR descriptions name the requirements implemented (`Implements bulk-csv-import#FN-004, FN-005, SEC-002`). Lets `git log --grep` answer "what changed because of FN-004?"
+- Comments on non-obvious code cite the requirement or ADR that explains it (`# PERF-002 — P95 < 500ms; this is why we batch-prefetch`).
+- A surprising design choice (an unusual data structure, a hand-rolled algorithm, a deviation from house style) names the ADR (`# Per ADR-0007 — using Postgres JSONB rather than a separate document store`).
+
+Don't pepper every line. Cite where the *why* would be lost otherwise.
+
+For one-line fixes and small refactors, skip the docs lookup — the cost of reading is higher than the cost of being wrong. For new endpoints, new background jobs, schema changes, or anything touching money/auth/PII, read first.
+
 ## Architecture: keep layers honest
 
 A typical service has four layers, even when they're not named that way:
