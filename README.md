@@ -68,6 +68,7 @@ Picking rules:
 |---|---|---|
 | devops-cicd | [.claude/skills/engineering/devops/devops-cicd/SKILL.md](.claude/skills/engineering/devops/devops-cicd/SKILL.md) | CI/CD pipelines (GitHub Actions, GitLab CI, Buildkite, Jenkins), Dockerfiles, deploy strategies (rolling/blue-green/canary), artifact registries, image signing, supply-chain security, branch protection. |
 | kubernetes-helm-gitops | [.claude/skills/engineering/devops/kubernetes-helm-gitops/SKILL.md](.claude/skills/engineering/devops/kubernetes-helm-gitops/SKILL.md) | Kubernetes manifests (Deployments/StatefulSets/Jobs), Helm charts, Argo CD / Flux, HPA/VPA/PDB, RBAC, network policies, ingress, debugging stuck rollouts and CrashLoopBackOff. |
+| pr-description-writer | [.claude/skills/engineering/devops/pr-description-writer/SKILL.md](.claude/skills/engineering/devops/pr-description-writer/SKILL.md) | Drafting pull-request descriptions and (with the user's go-ahead) opening the PR via `gh`. Picks from six templates (feature, bugfix, refactor, docs, chore, hotfix), starts every body with a plain-language TLDR, supports optional Checklist and Links sections, and never pushes or creates a PR without explicit approval. |
 
 ### Engineering / Testing
 
