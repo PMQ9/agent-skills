@@ -24,6 +24,7 @@ Picking rules:
 | Skill | Path | Use when |
 |---|---|---|
 | system-architecture | [.claude/skills/engineering/architecture/system-architecture/SKILL.md](.claude/skills/engineering/architecture/system-architecture/SKILL.md) | Designing new systems, evaluating patterns (monolith vs microservices, sync vs async, layered vs hexagonal), writing ADRs, debugging architectural smells. |
+| ai-solution-architect | [.claude/skills/engineering/architecture/ai-solution-architect/SKILL.md](.claude/skills/engineering/architecture/ai-solution-architect/SKILL.md) | High-level design of AI-integrated systems — whether to use AI at all, integration pattern (thin wrapper, RAG, agent, structured extraction), quality/latency/cost/privacy/reliability tradeoffs, vague "use AI" mandates, v1 architecture. Sits above the Engineering / AI implementation skills. |
 | api-design | [.claude/skills/engineering/architecture/api-design/SKILL.md](.claude/skills/engineering/architecture/api-design/SKILL.md) | Designing or reviewing HTTP APIs — REST, RPC, GraphQL, gRPC, webhooks; resource modeling, status codes, pagination, versioning, idempotency, rate limiting, OpenAPI. |
 
 ### Engineering / Backend
