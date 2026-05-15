@@ -20,3 +20,5 @@ SKILL-SUITE-CHANGES.md
 
 local-ai/claude-assistant-workspace/*
 .claude/skills/engineering/ai/local-llm-delegation-workspace/*
+_vibe-check/*
+*.pdf
