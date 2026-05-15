@@ -8,7 +8,7 @@ which model, the exact commands, and how Claude should consume the output.
 **When:** User has a folder of N items (emails, articles, PDFs already
 text-extracted) and wants a one-paragraph summary per item.
 
-**Model:** `qwen3` — reliable instruction-following on summarization.
+**Model:** `qwen3:8b` — reliable instruction-following on summarization.
 
 **Pattern:**
 
@@ -17,7 +17,7 @@ mkdir -p summaries
 for f in input_docs/*.txt; do
   out="summaries/$(basename "${f%.txt}").md"
   [ -f "$out" ] && continue   # resume-safe
-  ollama run qwen3 "Summarize the following document in one paragraph.
+  ollama run qwen3:8b "Summarize the following document in one paragraph.
 Focus on what action, if any, the reader should take.
 
 $(cat "$f")" > "$out"
@@ -38,7 +38,7 @@ long-running command.
 
 **When:** User uploads a scanned PDF (or screenshots) and wants the text out.
 
-**Model:** `qwen3vl` for the OCR pass.
+**Model:** `qwen3-vl:8b` for the OCR pass.
 
 **Pattern (page-by-page):**
 
@@ -51,7 +51,7 @@ pdftoppm -png -r 200 input.pdf pages/page
 mkdir -p text
 for img in pages/page-*.png; do
   out="text/$(basename "${img%.png}").txt"
-  python scripts/ollama_call.py chat --model qwen3vl \
+  python scripts/ollama_call.py chat --model qwen3-vl:8b \
     --prompt "Transcribe all visible text from this page. Preserve paragraph breaks. Do not summarize or paraphrase." \
     --image "$img" > "$out"
 done
@@ -63,7 +63,7 @@ cat text/page-*.txt > full_transcript.txt
 **Verification:** Open the first page of the PDF and the first text file
 side-by-side. Counts and proper nouns are easiest to spot-check. For legal
 or medical scans, escalate to a dedicated OCR (Tesseract, Document AI) —
-qwen3vl is good but not certified.
+qwen3-vl is good but not certified.
 
 ---
 
@@ -71,8 +71,9 @@ qwen3vl is good but not certified.
 
 **When:** User has a CSV and wants a new column with a categorical label.
 
-**Model:** `llama3.2:3b` or `phi4-mini:3.8b` — classification is the cheapest
-shape of task.
+**Model:** `llama3.2:3b` — classification is the cheapest shape of task. If
+the 3B model misclassifies in your spot check, step up to `qwen3:8b` (and
+re-do the rows it already labeled).
 
 **Pattern:**
 
@@ -113,7 +114,7 @@ unless the input is genuinely that skewed). Then spot-check 5 random rows.
 **When:** User has hundreds or thousands of text items and wants
 "find me the ones similar to this query."
 
-**Model:** `nomic-embed-text-v2-moe` (default, multilingual) — or `nomic-embed-text` if you're appending to an existing English-only index.
+**Model:** `nomic-embed-text-v2-moe` (default, multilingual) — or `nomic-embed-text:v1.5` if you're appending to an existing English-only index.
 
 **Pattern:**
 
@@ -203,7 +204,7 @@ them. Loading all 500 into your context is wasteful (and may not fit).
 
 **Pattern:**
 
-1. **Embed everything** with `nomic-embed-text` (Recipe 4 above).
+1. **Embed everything** with `nomic-embed-text-v2-moe` (Recipe 4 above).
 2. **Rank by similarity** to the user's question.
 3. **Triage the top ~30** with `llama3.2:3b`: "Is this document relevant
    to '<question>'? YES or NO."

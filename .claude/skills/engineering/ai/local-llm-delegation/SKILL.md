@@ -80,39 +80,102 @@ Pick the smallest model that can do the job. These are the models the user has
 configured on this machine; see `references/recipes.md` for worked examples per
 model.
 
-| Model | Modality | Best for |
+| Model tag | Modality | Best for |
 |---|---|---|
-| **llama3.2:3b** / **phi4-mini:3.8b** | Text | Triage, routing, "is this relevant?", quick cleanup. Fastest things on the box. |
+| **llama3.2:3b** | Text | Triage, routing, "is this relevant?", quick cleanup. Fastest thing on the box. |
 | **gemma3n:e4b** | Text + Image + Audio | Audio transcription, audio Q&A, light image captioning, low-RAM machines. The only one that hears. |
-| **qwen3** | Text | General-purpose: summarize, draft, extract structured data, shape JSON / tool-call payloads. Reliable instruction follower. |
-| **qwen3.6** | Text + tools + long context, optional thinking | Hard reasoning, long context, agentic / tool-using work. Heaviest model — only when the task needs it. |
-| **qwen3vl** | Text + Image | OCR, screenshot parsing, chart/table reading, UI parsing, visual Q&A. The vision specialist. |
-| **qwen3-coder-next** | Code | Code completion, boilerplate, mechanical refactors, syntax fixes. Narrower and faster than qwen3.6 for code-only work. |
+| **qwen3:8b** | Text | General-purpose: summarize, draft, extract structured data, shape JSON / tool-call payloads. Reliable instruction follower — the default workhorse. |
+| **phi4:14b** | Text | Stronger reasoning than qwen3:8b at the cost of more VRAM/latency. Reach for it when qwen3:8b's outputs need a quality bump but qwen3.6:35b would be overkill. |
+| **qwen3.6:35b** | Text + tools + long context, optional thinking | Hard reasoning, long context, agentic / tool-using work. Heaviest model — only when the task needs it. |
+| **qwen3-vl:8b** | Text + Image | OCR, screenshot parsing, chart/table reading, UI parsing, visual Q&A. The vision specialist. |
+| **qwen3-coder-next** | Code | Code completion, boilerplate, mechanical refactors, syntax fixes. Narrower and faster than qwen3.6:35b for code-only work. |
 | **nomic-embed-text-v2-moe** | Text → vector | **Default embedder.** Multilingual (~100 langs), MoE, Matryoshka dims (768 → 256) — use for new indexes, especially multilingual or storage-conscious. |
-| **nomic-embed-text** | Text → vector | English-only / legacy fallback. Keep using for indexes already built on it. |
+| **nomic-embed-text:v1.5** | Text → vector | English-only / legacy fallback. Keep using for indexes already built on it. |
 
 ### Quick decision rules
 
-- Bulk text task (summarize / draft / extract) → `qwen3`
-- Routing / classify / triage → `llama3.2:3b` or `phi4-mini:3.8b`
-- Image, screenshot, PDF page, chart → `qwen3vl`
+- Bulk text task (summarize / draft / extract) → `qwen3:8b`
+- Routing / classify / triage → `llama3.2:3b`
+- Same task but the 3B output looked sloppy → step up to `qwen3:8b`, then `phi4:14b`
+- Image, screenshot, PDF page, chart → `qwen3-vl:8b`
 - Audio → `gemma3n:e4b`
-- Embeddings for search / RAG / dedup → `nomic-embed-text-v2-moe` (default, multilingual); fall back to `nomic-embed-text` only for English-only or legacy indexes
+- Embeddings for search / RAG / dedup → `nomic-embed-text-v2-moe` (default, multilingual); fall back to `nomic-embed-text:v1.5` only for English-only or legacy indexes
 - Mechanical code / boilerplate → `qwen3-coder-next`
-- Hard reasoning that you'd still like to offload (rare) → `qwen3.6` with thinking on
-- In doubt and the corpus is small → `qwen3`
+- Hard reasoning that you'd still like to offload (rare) → `qwen3.6:35b` with thinking on
+- In doubt and the corpus is small → `qwen3:8b`
 
 If the exact model tag fails (`ollama list` doesn't show it), tell the user;
-don't silently substitute. Their setup is the source of truth.
+don't silently substitute. Their setup is the source of truth. Run
+`mcp__ollama__ollama_list` (or `ollama list` from the shell) to see what's
+actually installed.
 
 ## How to invoke
+
+Three ways, in preference order:
+1. **MCP tools** if `mcp__ollama__ollama_chat` / `ollama_embed` / `ollama_health` are in the
+   available tool list — prefer them. Native tool calls, no shell quoting, structured args
+   and structured returns. (Setup is in `local-ai/ollama-mcp/README.md`.)
+2. **Helper script** (`scripts/ollama_call.py`) for vision, embeddings, JSON mode, or
+   when you want to inspect what's about to happen.
+3. **Plain `ollama run`** for the shortest possible one-shot text invocation.
+
+### MCP tools (preferred when present)
+
+```
+mcp__ollama__ollama_health(model="qwen3:8b")
+  → {"ok": true, "host": "http://localhost:11434", "models_pulled": 10, "model_available": true}
+
+mcp__ollama__ollama_chat(
+  model="qwen3:8b",
+  prompt="Summarize this in one sentence: ...",
+  json_mode=False,
+)
+  → "<the model's reply>"
+
+mcp__ollama__ollama_chat(
+  model="qwen3-vl:8b",
+  prompt="Extract the table as markdown.",
+  images=["/Users/you/Desktop/page.png"],
+)
+
+mcp__ollama__ollama_embed(text="hello world")
+  → [0.012, -0.041, ...]   # uses nomic-embed-text-v2-moe by default
+```
+
+Errors from the tools (daemon unreachable, model not pulled) come back as exceptions
+with the same guidance the helper script gives — surface them to the user instead of
+swallowing them.
+
+#### Cowork subagent caveat
+
+In Claude Cowork, when you spawn a subagent (`general-purpose`, etc.) and want
+it to use Ollama, the `mcp__ollama__*` tools are **deferred** — they show up by
+name in the subagent's system reminder but their JSON schemas aren't loaded
+yet. The subagent must call `ToolSearch` first:
+
+```
+ToolSearch(
+  query="select:mcp__ollama__ollama_chat,mcp__ollama__ollama_health,mcp__ollama__ollama_list,mcp__ollama__ollama_embed",
+  max_results=4,
+)
+```
+
+After that the tools are callable as normal. **When you write a subagent prompt
+that should delegate to Ollama, include a one-line instruction telling it to
+load those schemas via ToolSearch before invoking.** The main Cowork session
+doesn't need this step — only spawned subagents do.
+
+This applies only to Cowork. In Claude Code CLI and Claude Desktop the tools
+appear directly.
+
+### Helper script (fallback / inspection)
 
 Two ways, in rough order of preference. **Default to the CLI** — it's the
 shortest path and works everywhere. **Reach for the helper script** when you
 need vision, embeddings, structured JSON output, or to check whether Ollama is
 even running.
 
-### CLI (default)
+### Plain CLI
 
 ```bash
 # One-shot text prompt
@@ -131,7 +194,7 @@ cat big-doc.txt | ollama run qwen3 "Summarize the above in 5 bullets."
 The CLI streams. If you're capturing the output for downstream processing,
 that's fine — bash collects it before you read it.
 
-### HTTP helper (vision, embeddings, JSON mode, health check)
+### HTTP helper script details
 
 The helper script lives at `scripts/ollama_call.py`. It uses the stdlib only
 and talks to `http://localhost:11434`. It exposes three subcommands:

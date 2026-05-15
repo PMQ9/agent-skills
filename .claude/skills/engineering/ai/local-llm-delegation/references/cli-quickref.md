@@ -2,47 +2,54 @@
 
 One-liners per model. Copy and adapt. Assumes Ollama daemon is running.
 
-## llama3.2:3b / phi4-mini:3.8b — triage, routing
+## llama3.2:3b — triage, routing
 
 ```bash
 # Yes/no relevance check
 ollama run llama3.2:3b "Is this email about billing? Reply only YES or NO.\n\n$(cat email.txt)"
 
 # Three-way classification
-ollama run phi4-mini:3.8b "Classify as billing | support | sales. One word.\n\n$(cat ticket.txt)"
+ollama run llama3.2:3b "Classify as billing | support | sales. One word.\n\n$(cat ticket.txt)"
 ```
 
-## qwen3 — general-purpose text
+## qwen3:8b — general-purpose text
 
 ```bash
 # Summarize
-ollama run qwen3 "Summarize in 3 bullets:\n\n$(cat doc.txt)"
+ollama run qwen3:8b "Summarize in 3 bullets:\n\n$(cat doc.txt)"
 
 # Structured extraction (use HTTP helper for guaranteed JSON)
-python scripts/ollama_call.py chat --model qwen3 --json \
+python scripts/ollama_call.py chat --model qwen3:8b --json \
   --prompt "Extract {sender, date, amount_usd} as JSON from this email:\n$(cat email.txt)"
 ```
 
-## qwen3.6 — hard reasoning, long context, agentic
+## phi4:14b — mid-weight reasoning
+
+```bash
+# Use when qwen3:8b's output looked sloppy but qwen3.6:35b would be overkill
+ollama run phi4:14b "Walk through whether this code change is safe under concurrent writes:\n\n$(cat diff.patch)"
+```
+
+## qwen3.6:35b — hard reasoning, long context, agentic
 
 ```bash
 # Reasoning with thinking mode
-ollama run qwen3.6 "/think Plan a migration from MySQL to Postgres for a 2TB table with FK constraints and live writes."
+ollama run qwen3.6:35b "/think Plan a migration from MySQL to Postgres for a 2TB table with FK constraints and live writes."
 
 # Long-context summarization (feed a whole book chapter)
-cat chapter.txt | ollama run qwen3.6 "Outline the main argument and identify the three weakest claims."
+cat chapter.txt | ollama run qwen3.6:35b "Outline the main argument and identify the three weakest claims."
 ```
 
-## qwen3vl — vision
+## qwen3-vl:8b — vision
 
 ```bash
 # OCR a screenshot
-python scripts/ollama_call.py chat --model qwen3vl \
+python scripts/ollama_call.py chat --model qwen3-vl:8b \
   --prompt "Transcribe every word visible in this screenshot. Preserve layout where possible." \
   --image screenshot.png
 
 # Extract a table from an image
-python scripts/ollama_call.py chat --model qwen3vl --json \
+python scripts/ollama_call.py chat --model qwen3-vl:8b --json \
   --prompt "Extract this table as a JSON array of row objects." \
   --image table.png
 ```
@@ -93,8 +100,8 @@ done < lines.txt > embeddings.jsonl
 ## Health check before a long run
 
 ```bash
-python scripts/ollama_call.py health --model qwen3 || {
-  echo "ollama or qwen3 unavailable — tell the user before starting"
+python scripts/ollama_call.py health --model qwen3:8b || {
+  echo "ollama or qwen3:8b unavailable — tell the user before starting"
   exit 1
 }
 ```

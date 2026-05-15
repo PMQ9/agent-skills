@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.local.ollama-mcp</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__INSTALL_DIR__/.venv/bin/python</string>
+    <string>__INSTALL_DIR__/server.py</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>MCP_TRANSPORT</key>
+    <string>sse</string>
+    <key>MCP_HOST</key>
+    <string>0.0.0.0</string>
+    <key>MCP_PORT</key>
+    <string>8765</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/ollama-mcp.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/ollama-mcp.err</string>
+</dict>
+</plist>
