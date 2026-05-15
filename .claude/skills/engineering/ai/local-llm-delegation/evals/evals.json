@@ -1,0 +1,33 @@
+{
+  "skill_name": "local-llm-delegation",
+  "evals": [
+    {
+      "id": 0,
+      "name": "bulk-email-classification",
+      "prompt": "ok so i've got this folder ~/Downloads/q2-tickets/ with like 180 customer support emails as .txt files and i need to categorize each one as billing / technical / sales / other. i was going to just have you read them all but that feels wasteful. it's gonna be ~180 short emails, maybe 200 words each. what's the move? assume i have ollama set up on my machine.",
+      "expected_output": "Should recognize this as a delegation candidate (bulk, mechanical, easily verifiable). Should propose a small triage model (llama3.2:3b or phi4-mini:3.8b) — NOT delegate to qwen3.6 or qwen3vl. Should write a loop / script that classifies each ticket. Should mention sanity-checking on one item first, and spot-checking the batch.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "screenshot-ocr",
+      "prompt": "i took a screenshot of a benefits enrollment page at work and saved it to ~/Desktop/benefits.png. there's a table on it with my plan options and i want to get the table out as proper text/markdown so i can compare them side by side. can you do that?",
+      "expected_output": "Should use qwen3vl via the HTTP helper (vision is the canonical case). Should NOT try to read the image natively, NOT use qwen3 (text-only), NOT use gemma3n by default. Should produce the helper command with --image flag and a clear prompt asking for the table content.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "pydantic-boilerplate",
+      "prompt": "i need a pydantic v2 model called BookingRequest with these fields:\n- booking_id: UUID\n- guest_email: validated email\n- room_type: enum of standard/deluxe/suite\n- check_in: date\n- check_out: date\n- nightly_rate_cents: positive int\n- guest_count: int between 1 and 8\n- special_requests: optional string\n\nplus a Booking class that extends it with a created_at datetime and a status (pending/confirmed/cancelled). put it in models/booking.py please.",
+      "expected_output": "Should recognize as mechanical code boilerplate. Should delegate to qwen3-coder-next (or qwen3 if coder-next is unavailable). Should verify the output (run syntax check or at least mention it). Should write the result to models/booking.py.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "migration-architecture-judgment",
+      "prompt": "we're planning to move our user accounts from a single-tenant MySQL setup to a multi-tenant Postgres with row-level security. the user table has ~12M rows, there are 40+ tables that FK to it, and we have ~50 writes/sec at peak. zero downtime is a hard requirement, and there's a compliance review (SOC2) for anything that touches PII. walk me through how you'd plan the migration — what order, what risks, what rollback looks like.",
+      "expected_output": "Should NOT delegate to a local model. This is judgment-heavy architecture work where confident-wrong is expensive. Claude should answer it directly with substantive content: phased migration, dual-write strategy, backfill plan, RLS rollout, rollback gates, SOC2 considerations. The skill is loaded but should self-suppress on this case.",
+      "files": []
+    }
+  ]
+}

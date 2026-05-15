@@ -17,3 +17,5 @@ SKILL-SUITE-CHANGES.md
 
 # Built .skill packages (derived from SKILL.md sources)
 *.skill
+
+local-ai/claude-assistant-workspace/*
