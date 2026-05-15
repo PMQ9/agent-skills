@@ -100,13 +100,13 @@ Cowork Linux sandbox
 
 You don't need a public tunnel, auth shim, or org allowlist. If `mcp__ollama__*` works in your local Claude Code, it works in Cowork.
 
-**One Cowork-specific wrinkle: subagents see Ollama tools as *deferred* tools.** A spawned subagent (`general-purpose`, etc.) won't have `mcp__ollama__*` in its initial tool list — only the names show up in a system reminder. Before the subagent can invoke them, it must call:
+**One Cowork-specific wrinkle: Ollama tools are *deferred* in both the main session and in subagents.** They show up by name in a system reminder ("The following deferred tools are now available via ToolSearch") but their JSON schemas aren't loaded yet — calling them directly will fail with InputValidationError. Load the schemas once via ToolSearch before the first call:
 
 ```
 ToolSearch(query="select:mcp__ollama__ollama_chat,mcp__ollama__ollama_health,mcp__ollama__ollama_list,mcp__ollama__ollama_embed", max_results=4)
 ```
 
-to load the JSON schemas. After that, the tools are callable as normal. **If you delegate Ollama work to a subagent, say so in the subagent's prompt**, e.g. "Use ToolSearch to load the `mcp__ollama__*` tools, then call `ollama_chat` to ...". The main Cowork session does *not* need this step — it gets the schemas at startup.
+After that the tools are callable as normal for the rest of the session. **If you delegate Ollama work to a subagent, repeat this in the subagent's prompt** — the subagent starts with its own fresh tool list and won't have inherited yours. Example: "Use ToolSearch to load the `mcp__ollama__*` tools, then call `ollama_chat` to ...". In Claude Code CLI and Claude Desktop the tools appear directly with no ToolSearch step needed.
 
 ### Path that doesn't work without extra plumbing: Cowork *custom connector* (remote MCP)
 

@@ -1,16 +1,25 @@
 #!/usr/bin/env python3
 """Ollama MCP server.
 
-Exposes the local Ollama HTTP API as MCP tools so Claude Code (CLI) and Claude
-Desktop can call them natively instead of shelling out.
+Exposes the local Ollama HTTP API as MCP tools so Claude Code (CLI), Claude
+Desktop, and Claude Cowork can call them natively instead of shelling out.
 
-Claude Cowork is NOT supported: Cowork's custom MCP connectors are called from
-Anthropic's cloud and require a publicly-reachable URL + org-admin allowlist,
-which defeats the privacy/latency wins of running things locally. See README's
-"About Claude Cowork" section.
+Cowork support is via the Claude Code bridge: when this server is registered
+in ~/.claude/mcp_servers.json, Cowork's Linux sandbox tunnels tool calls back
+through the bridge to your local Claude Code, which spawns this server as a
+stdio process. No public tunnel or custom-connector setup is needed. The
+separate Cowork *custom remote MCP connector* flow would require a publicly
+reachable URL + org-admin allowlist and is not how this server is intended
+to be used — see README's "About Claude Cowork" section.
+
+In Cowork, the `mcp__ollama__*` tools are *deferred* in both the main
+session and in spawned subagents — they must call
+`ToolSearch(query="select:mcp__ollama__ollama_chat,...")` once before
+the first invocation. Claude Code CLI and Claude Desktop don't need this.
 
 Transports:
-    stdio (default)        — Claude Code CLI and Claude Desktop spawn this process.
+    stdio (default)        — Claude Code CLI, Claude Desktop, and the Cowork
+                             bridge all spawn this process over stdio.
     sse                    — HTTP server for advanced/non-Claude clients or test rigs.
     streamable-http        — Newer HTTP transport; functionally equivalent to sse.
 

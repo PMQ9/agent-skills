@@ -19,3 +19,4 @@ SKILL-SUITE-CHANGES.md
 *.skill
 
 local-ai/claude-assistant-workspace/*
+.claude/skills/engineering/ai/local-llm-delegation-workspace/*

@@ -46,7 +46,7 @@ Hand off to a local model when the task is any of these:
   machine.
 - **Vision / audio.** OCR, screenshot parsing, chart reading, transcription.
   You don't natively process audio at all; vision is expensive when you do. A
-  call to `qwen3vl` or `gemma3n` is often the right move just on cost grounds.
+  call to `qwen3-vl` or `gemma3n` is often the right move just on cost grounds.
 - **Pre-filtering big corpora.** Use `nomic-embed-text-v2-moe` to produce vectors,
   then narrow 10,000 docs down to the 50 worth your attention. Embeddings are
   almost free — use them freely.
@@ -146,12 +146,14 @@ Errors from the tools (daemon unreachable, model not pulled) come back as except
 with the same guidance the helper script gives — surface them to the user instead of
 swallowing them.
 
-#### Cowork subagent caveat
+#### Cowork ToolSearch caveat
 
-In Claude Cowork, when you spawn a subagent (`general-purpose`, etc.) and want
-it to use Ollama, the `mcp__ollama__*` tools are **deferred** — they show up by
-name in the subagent's system reminder but their JSON schemas aren't loaded
-yet. The subagent must call `ToolSearch` first:
+In Claude Cowork, the `mcp__ollama__*` tools are **deferred** — they show up
+by name in a system reminder ("The following deferred tools are now available
+via ToolSearch") but their JSON schemas aren't loaded yet, so calling them
+directly will fail with InputValidationError. This is true in **both the main
+Cowork session and in spawned subagents** — load the schemas via ToolSearch
+before the first call:
 
 ```
 ToolSearch(
@@ -160,13 +162,14 @@ ToolSearch(
 )
 ```
 
-After that the tools are callable as normal. **When you write a subagent prompt
-that should delegate to Ollama, include a one-line instruction telling it to
-load those schemas via ToolSearch before invoking.** The main Cowork session
-doesn't need this step — only spawned subagents do.
+After that the tools are callable as normal for the rest of the session.
+**When you spawn a subagent that should delegate to Ollama, include a one-line
+instruction in its prompt telling it to ToolSearch those schemas before
+invoking** — the subagent starts with its own fresh tool list and won't have
+inherited yours.
 
 This applies only to Cowork. In Claude Code CLI and Claude Desktop the tools
-appear directly.
+appear directly with no ToolSearch step needed.
 
 ### Helper script (fallback / inspection)
 
@@ -179,17 +182,21 @@ even running.
 
 ```bash
 # One-shot text prompt
-ollama run qwen3 "Summarize this email in one sentence: $(cat /path/to/email.txt)"
+ollama run qwen3:8b "Summarize this email in one sentence: $(cat /path/to/email.txt)"
 
 # Many items via a loop
 for f in /path/to/emails/*.txt; do
   echo "=== $f ==="
-  ollama run qwen3 "Classify this email as billing | support | sales. Reply with one word only.\n\n$(cat "$f")"
+  ollama run qwen3:8b "Classify this email as billing | support | sales. Reply with one word only.\n\n$(cat "$f")"
 done
 
 # Pipe stdin if the input is large
-cat big-doc.txt | ollama run qwen3 "Summarize the above in 5 bullets."
+cat big-doc.txt | ollama run qwen3:8b "Summarize the above in 5 bullets."
 ```
+
+Always pin the tag (`qwen3:8b`, not `qwen3`). On this machine `qwen3:latest`
+isn't pulled — a tagless command would fail. Run `ollama list` (or
+`mcp__ollama__ollama_list`) if you're unsure which exact tag is available.
 
 The CLI streams. If you're capturing the output for downstream processing,
 that's fine — bash collects it before you read it.
@@ -201,15 +208,15 @@ and talks to `http://localhost:11434`. It exposes three subcommands:
 
 ```bash
 # Text chat — prompt on argv or stdin
-python scripts/ollama_call.py chat --model qwen3 --prompt "Summarize: ..."
+python scripts/ollama_call.py chat --model qwen3:8b --prompt "Summarize: ..."
 
 # Vision — pass image paths
-python scripts/ollama_call.py chat --model qwen3vl \
+python scripts/ollama_call.py chat --model qwen3-vl:8b \
   --prompt "Extract all text from this screenshot." \
   --image /path/to/screenshot.png
 
 # JSON mode — force structured output
-python scripts/ollama_call.py chat --model qwen3 \
+python scripts/ollama_call.py chat --model qwen3:8b \
   --prompt "Extract sender, date, amount from this email." \
   --json
 
@@ -218,7 +225,7 @@ python scripts/ollama_call.py embed --model nomic-embed-text-v2-moe \
   --text "the quick brown fox"
 
 # Health check — exits 0 if Ollama is up and the model is pulled
-python scripts/ollama_call.py health --model qwen3
+python scripts/ollama_call.py health --model qwen3:8b
 ```
 
 Run `python scripts/ollama_call.py --help` for the full surface. The script is
@@ -231,8 +238,8 @@ the result, then unroll. A 30-second sanity check has paid for itself many
 times.
 
 ```bash
-python scripts/ollama_call.py health --model qwen3 || {
-  echo "Ollama isn't reachable or qwen3 isn't pulled. Tell the user."
+python scripts/ollama_call.py health --model qwen3:8b || {
+  echo "Ollama isn't reachable or qwen3:8b isn't pulled. Tell the user."
   exit 1
 }
 ```
@@ -277,7 +284,7 @@ trust the batch.
 
 ## Communicating with the user
 
-When you delegate, surface it lightly so the user can audit: *"Running qwen3
+When you delegate, surface it lightly so the user can audit: *"Running qwen3:8b
 locally to classify these — back in a moment."* Show the model and (when it
 matters) which subset of items you tested before unrolling.
 
