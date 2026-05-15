@@ -56,6 +56,26 @@ When AI *is* the right tool, it tends to be because the input is messy and natur
 
 Name the tradeoff out loud. If the user asked for AI and rules would serve them better, say so. Sometimes AI is still right after the conversation. Sometimes it isn't, and you saved them six months.
 
+## Looking for the cheaper, weirder version
+
+The obvious architecture is almost always more expensive and more risky than the one a great engineer ends up shipping. Before committing to the shape the user described, spend two minutes deliberately looking for the reframe that captures most of the value at lower stakes. A handful of moves work disproportionately often:
+
+**Invert who the AI serves.** If the obvious answer is customer-facing, ask whether an agent-side copilot does most of the same work without the brand and accuracy exposure. If the obvious answer is student-facing, ask whether helping teachers / TAs / advisors scales their judgment instead. The replacement framing and the multiplier framing have very different risk profiles for the same underlying value.
+
+**Don't build the hard part — change the problem.** When the spec says "the AI must do X reliably" and X is genuinely hard, the creative move is often to redesign the workflow so reliability at X matters less. AI plagiarism detection is hard; oral defenses and process-based assessment moot it. Real-time chatbot accuracy is hard; a cached deterministic answer for the top 200 questions deflects most volume at zero AI risk.
+
+**Decompose to find the leverage point.** "AI for our research" or "AI for our customer support" is rarely one task — it's five or six. Sketch the actual workflow and ask which step would be most transformed by AI assistance. It is rarely the step the user named first. Often the clever architecture automates an unsexy middle step that's eating disproportionate time.
+
+**Push work out of the model.** Lookup beats reasoning. Structured data beats free text. Deterministic rules beat generation when they apply. If part of the system reduces to "the model figures out X," ask whether X could be a database query, a small classifier, or a rules layer — with the model handling only the genuinely fuzzy remainder.
+
+**Flip the direction.** Instead of AI generating, AI critiquing. Instead of AI deciding, AI surfacing options for a human to choose between. Instead of AI answering, AI asking the right follow-up question. These flips are often safer (the human stays the author), cheaper (less generation), and more valuable (humans are typically better critics than blank-page writers).
+
+**Find the cheapest 80%.** What's the simplest version that captures most of the value? Often the answer isn't "ship a smaller model" — it's "ship a different feature." A button that does the single most-common task is frequently worth more than an open chat box that can do anything.
+
+**Question the chat-shaped reflex.** "AI feature" gets translated to "chatbot" almost reflexively. Ask whether the actual job needs a conversation at all. A semantic-search-enhanced filter, a one-shot extraction, a daily digest, or an inline suggestion are often better surfaces than a chat UI — cheaper to build, easier to evaluate, harder to misuse.
+
+The discipline isn't to always reframe — it's to *spend two minutes deliberately looking* before accepting the obvious shape. If the obvious shape survives the look, ship it with confidence. If something cheaper and weirder turns out to be better, you've found the leverage. Either way, surface the reframe you considered, even briefly, so the user knows the obvious path wasn't accepted by default.
+
 ## What to know before you can design
 
 Load-bearing questions. You almost never need all of them — but if any are unknown, name it explicitly in the design.
