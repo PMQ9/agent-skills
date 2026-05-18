@@ -1,6 +1,6 @@
 ---
 name: local-llm-delegation
-description: Use this skill when the user has a local Ollama server and the task is bulk, mechanical, easily-verifiable, or privacy-sensitive — anything where offloading to a 3B-8B local model would save Claude context and API tokens. Trigger on document processing at volume (OCR a PDF, transcribe audio, extract fields from many emails), mechanical code (CRUD scaffold, Pydantic models, 1:1 renames), bulk classification or routing ("which tickets are billing?"), embeddings for RAG/dedup, fast triage ("is this relevant?"), screenshot/UI parsing, and any time you're about to burn many tokens on work a small model could plausibly do. Trigger even when the user didn't say "Ollama" — if it's set up, often delegate without asking. Do NOT trigger for judgment-heavy reasoning, full-repo-context work, confident-wrong-is-expensive tasks, or one-shot questions you can just answer.
+description: Use this skill when the user has a local Ollama server and the task is bulk, mechanical, easily-verifiable, or privacy-sensitive — anything where offloading to a local model (3B through 35B) would save Claude context and API tokens. Trigger on document processing at volume (OCR a PDF, transcribe audio, extract fields from many emails), mechanical code (CRUD scaffold, Pydantic models, 1:1 renames), bulk classification or routing ("which tickets are billing?"), embeddings for RAG/dedup, fast triage ("is this relevant?"), screenshot/UI parsing, and any time you're about to burn many tokens on work a small model could plausibly do. Trigger even when the user didn't say "Ollama" — if it's set up, often delegate without asking. Do NOT trigger for judgment-heavy reasoning, full-repo-context work, confident-wrong-is-expensive tasks, or one-shot questions you can just answer.
 ---
 
 # Local LLM Delegation
@@ -84,9 +84,9 @@ model.
 |---|---|---|
 | **llama3.2:3b** | Text | Triage, routing, "is this relevant?", quick cleanup. Fastest thing on the box. |
 | **gemma3n:e4b** | Text + Image + Audio | Audio transcription, audio Q&A, light image captioning, low-RAM machines. The only one that hears. |
-| **qwen3:8b** | Text | General-purpose: summarize, draft, extract structured data, shape JSON / tool-call payloads. Reliable instruction follower — the default workhorse. |
+| **qwen3:8b** | Text | The reliable intern. Straightforward, well-defined tasks: bulk classification, schema-strict JSON extraction, terse-output prompts. Fallback when the default workhorse times out or fights a tight format. |
 | **phi4:14b** | Text | Stronger reasoning than qwen3:8b at the cost of more VRAM/latency. Reach for it when qwen3:8b's outputs need a quality bump but qwen3.6:35b would be overkill. |
-| **qwen3.6:35b** | Text + tools + long context, optional thinking | Hard reasoning, long context, agentic / tool-using work. Heaviest model — only when the task needs it. |
+| **qwen3.6:35b** | Text + tools + long context, optional thinking | The senior engineer and default workhorse. Reasoning, drafting, judgment-flavored extraction, long context, agentic / tool-using work. |
 | **qwen3-vl:8b** | Text + Image | OCR, screenshot parsing, chart/table reading, UI parsing, visual Q&A. The vision specialist. |
 | **qwen3-coder-next** | Code | Code completion, boilerplate, mechanical refactors, syntax fixes. Narrower and faster than qwen3.6:35b for code-only work. |
 | **nomic-embed-text-v2-moe** | Text → vector | **Default embedder.** Multilingual (~100 langs), MoE, Matryoshka dims (768 → 256) — use for new indexes, especially multilingual or storage-conscious. |
@@ -94,14 +94,14 @@ model.
 
 ### Quick decision rules
 
-- Bulk text task (summarize / draft / extract) → `qwen3:8b`
+- Bulk text task (reasoning/ summarize / draft / extract) → `qwen3.6:35b`
 - Routing / classify / triage → `llama3.2:3b`
 - Same task but the 3B output looked sloppy → step up to `qwen3:8b`, then `phi4:14b`
 - Image, screenshot, PDF page, chart → `qwen3-vl:8b`
 - Audio → `gemma3n:e4b`
 - Embeddings for search / RAG / dedup → `nomic-embed-text-v2-moe` (default, multilingual); fall back to `nomic-embed-text:v1.5` only for English-only or legacy indexes
 - Mechanical code / boilerplate → `qwen3-coder-next`
-- Hard reasoning that you'd still like to offload (rare) → `qwen3.6:35b` with thinking on
+- Strict format / terse output (one sentence, N bullets, no preface) → `qwen3:8b`
 - In doubt and the corpus is small → `qwen3:8b`
 
 If the exact model tag fails (`ollama list` doesn't show it), tell the user;
@@ -300,5 +300,8 @@ them get there.
   boilerplate). Read this when you want a pattern to copy.
 - `references/cli-quickref.md` — one-line CLI invocations per model. Read this
   when you just need the command.
+- `references/workhorse-benchmark.md` — head-to-head benchmark comparing
+  qwen3:8b and qwen3.6:35b. Read when reconsidering which model handles
+  which kind of work.
 - `scripts/ollama_call.py` — the HTTP helper. Read it if anything goes wrong;
   it's small enough to understand in one pass.
