@@ -2,6 +2,7 @@ name: Bug report
 description: Something is broken or behaving incorrectly.
 title: "[Bug]: "
 labels: ["bug", "triage"]
+assignees: ["PMQ9"]
 body:
   - type: markdown
     attributes:

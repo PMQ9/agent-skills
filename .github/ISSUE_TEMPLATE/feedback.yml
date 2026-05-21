@@ -2,6 +2,7 @@ name: Feedback
 description: Open-ended feedback — what worked, what didn't, suggestions.
 title: "[Feedback]: "
 labels: ["feedback", "triage"]
+assignees: ["PMQ9"]
 body:
   - type: markdown
     attributes:

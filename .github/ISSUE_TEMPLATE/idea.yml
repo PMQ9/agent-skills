@@ -2,6 +2,7 @@ name: Idea / discussion
 description: A half-formed idea worth talking through before it becomes a feature request.
 title: "[Idea]: "
 labels: ["idea", "discussion"]
+assignees: ["PMQ9"]
 body:
   - type: markdown
     attributes:
