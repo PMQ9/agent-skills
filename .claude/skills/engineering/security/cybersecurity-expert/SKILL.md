@@ -12,6 +12,8 @@ description: >-
   here". Also supports an explicit "update news" mode — on "update news", "refresh the threat
   landscape", or "pull the latest CVEs", it pulls current attacks and CVEs from a hardcoded
   whitelist of trusted sources and appends them to its own threat-landscape reference.
+version: 1.0.0
+last_updated: 2026-06-07
 ---
 
 # Cybersecurity Expert
