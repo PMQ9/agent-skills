@@ -1,10 +1,10 @@
 # Current Threat Landscape
 
 <!-- update-metadata: keep this block at the top; update mode restamps ONLY this block each run (the entry sections below are an append log, never rewritten or deleted) -->
-- **Last updated:** 2026-06-07
+- **Last updated:** 2026-06-29
 - **Updated by:** update news mode (see SKILL.md)
-- **Sources consulted:** CISA KEV, NVD, Unit 42, Microsoft, Mandiant/Google, CrowdStrike, Talos
-- **Entries:** 21
+- **Sources consulted:** CISA KEV, Rapid7, Microsoft
+- **Entries:** 28
 
 This file grounds advice in what is actually being exploited right now. It is an append log:
 update mode adds new entries at the top of the relevant section and leaves older ones in place
@@ -17,6 +17,12 @@ blocks. Every entry cites a dated source from the allowlist (`assets/trusted_sou
 
 ## Actively exploited vulnerabilities (CISA KEV and vendor reporting)
 
+- **2026-06-25** — Cisco Unified CM SSRF & PTC Windchill/FlexPLM input validation (CVE-2026-20230, CVE-2026-12569): both added to CISA KEV on active exploitation. → SSRF and weak input validation in enterprise apps stay KEV-worthy; patch on disclosure. [CISA KEV](https://www.cisa.gov/news-events/alerts/2026/06/25/cisa-adds-two-known-exploited-vulnerabilities-catalog)
+- **2026-06-23** — Ubiquiti UniFi OS (CVE-2026-34908 access-control, CVE-2026-34909 path traversal, CVE-2026-34910 input validation) & Lantronix EDS5000 code injection (CVE-2025-67038): four KEV additions. → Keep network/IoT management interfaces off the public internet and patch on disclosure. [CISA KEV](https://www.cisa.gov/news-events/alerts/2026/06/23/cisa-adds-four-known-exploited-vulnerabilities-catalog)
+- **2026-06-16** — Joomla Content Editor improper access control (CVE-2026-48907): added to CISA KEV on active exploitation. → CMS extensions are a recurring foothold; patch and restrict editor privileges. [CISA KEV](https://www.cisa.gov/news-events/alerts/2026/06/16/cisa-adds-one-known-exploited-vulnerability-catalog)
+- **2026-06-12** — Oracle PeopleSoft PeopleTools SSRF→RCE (CVE-2026-35273): unauthenticated CVSS 9.8 flaw in the Environment Management Hub, exploited as a zero-day (May 27–Jun 9) by ShinyHunters/UNC6240 heavily against higher education; KEV 2026-06-12. → Block /PSEMHUB and /PSIGW externally and emergency-patch edge ERP; SSRF chains to RCE. [Rapid7](https://www.rapid7.com/blog/post/etr-active-exploitation-of-oracle-peoplesoft-zero-day-cve-2026-35273/)
+- **2026-06-09** — Check Point Remote Access VPN auth bypass (CVE-2026-50751): CVSS 9.3 IKEv1 certificate-validation flaw lets unauthenticated attackers open VPN sessions; exploited since May, linked to Qilin ransomware; added to CISA KEV. → Retire IKEv1/legacy clients, require machine certs, patch end-of-support VPN gateways. [Rapid7](https://www.rapid7.com/blog/post/etr-critical-check-point-vpn-zero-day-exploited-in-the-wild-cve-2026-50751/)
+- **2026-06-09** — Chromium V8 OOB read/write (CVE-2026-11645), Cisco Catalyst SD-WAN Manager output-escaping (CVE-2026-20245) & Arista EOS incomplete comparison (CVE-2026-7473): three KEV additions. → Browsers and network OSes are prime targets; enable auto-update and patch fast. [CISA KEV](https://www.cisa.gov/news-events/alerts/2026/06/09/cisa-adds-three-known-exploited-vulnerabilities-catalog)
 - **2026-06-02** — PAN-OS Captive Portal RCE (CVE-2026-0300): buffer overflow in the User-ID Authentication Portal gives unauthenticated root RCE on PA-/VM-Series firewalls; exploited by state-linked cluster CL-STA-1132. → Never expose mgmt/captive portals to the internet; patch edge appliances on disclosure. [Unit 42](https://unit42.paloaltonetworks.com/captive-portal-zero-day/)
 - **2026-06-02** — Linux Kernel improper authentication (CVE-2022-0492): cgroups v1 flaw enabling container escape to host root, added to CISA KEV on active exploitation. → Patch kernels and harden container isolation; old CVEs still get weaponized. [CISA KEV](https://www.cisa.gov/news-events/alerts/2026/06/02/cisa-adds-two-known-exploited-vulnerabilities-catalog)
 - **2026-06-02** — Android Framework integer overflow (CVE-2025-48595): memory-corruption flaw added to CISA KEV on evidence of active exploitation. → Keep mobile fleets on current security patch level; mobile is in scope for KEV. [CISA KEV](https://www.cisa.gov/news-events/alerts/2026/06/02/cisa-adds-two-known-exploited-vulnerabilities-catalog)
@@ -38,6 +44,7 @@ blocks. Every entry cites a dated source from the allowlist (`assets/trusted_sou
 
 ## Notable campaigns and breaches (context for threat models)
 
+- **2026-06-24** — Microsoft DCU disrupts StealC & Amadey infostealer infrastructure: takedown/suspension of the domains backing these malware-as-a-service operations. → Infostealers feed credential theft and ransomware; monitor for stealer IOCs and rotate exposed credentials. [Microsoft](https://www.microsoft.com/en-us/security/blog/2026/06/24/stealc-and-amadey-breaking-down-infostealers-and-the-cybercrime-services-that-deliver-them/)
 - **2026-05** — Mandiant M-Trends 2026: global median dwell time rose to 14 days (from 11), driven by long-term espionage and DPRK IT-worker operations. → Detection still lags persistence; invest in identity monitoring and insider-threat controls. [Google/Mandiant](https://cloud.google.com/blog/topics/threat-intelligence/m-trends-2026)
 - **2026-05** — CrowdStrike 2026 Financial Services report: DPRK-nexus actors stole billions in digital assets; MURKY PANDA ran an operational-relay-box network across 150+ endpoints in 36 countries hitting 340 orgs. → Adversaries industrialize with AI deception and ORB infrastructure; assume relay-laundered traffic. [CrowdStrike](https://www.crowdstrike.com/en-us/press-releases/crowdstrike-2026-financial-services-threat-landscape-report/)
 - **2026 Q1** — Cisco Talos IR Trends Q1 2026: phishing reemerged as the top initial-access vector, with public administration the most-targeted vertical. → Email remains the front door; prioritize phishing-resistant MFA and user reporting. [Talos](https://blog.talosintelligence.com/ir-trends-q1-2026/)
