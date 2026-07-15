@@ -2,6 +2,9 @@
 .DS_Store
 .gitignore
 
+# # Local-only visible symlink -> .claude (so the hidden dotfolder shows in Finder)
+# /claude
+
 # Per-skill workspace artifacts from skill development / eval runs
 # Any *-workspace/ dir (skill-dev / eval scratch), anywhere in the tree
 *-workspace/
