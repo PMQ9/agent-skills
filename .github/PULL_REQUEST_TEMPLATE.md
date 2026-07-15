@@ -1,43 +1,50 @@
-## Summary
+<!--
+PULL REQUEST TEMPLATE — fill every section. Delete this comment block before submitting.
+AI agents: do NOT remove section headings. Triage and review automation parse them.
+-->
 
-<!-- One or two sentences describing what this PR does. -->
+## TL;DR
+<!-- One or two sentences. What does this PR do, in plain language? -->
 
-## Related issue
 
-<!-- Link the issue this closes, e.g., "Closes #123". If no issue exists, briefly explain why. -->
+## What this does
+<!-- The change in detail. Bullet the concrete additions/removals/refactors. -->
+-
+-
 
-## Type of change
+## Why
+<!-- The motivation. Link the issue this closes: "Closes #123".
+     NOTE: `Closes #N` is the ONLY place to use `#N`. Elsewhere write "issue 123"
+     or "PR 123" — a bare `#N` cross-references and clutters unrelated threads. -->
+- Closes #
 
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Refactor / cleanup (no behavior change)
-- [ ] Documentation
-- [ ] Infrastructure / tooling / CI
-- [ ] Other (describe below)
+## How it works
+<!-- Key implementation notes a reviewer needs: approach, tradeoffs, anything non-obvious. -->
 
-## What changed
 
-<!-- More detail than the summary: design decisions, tradeoffs, anything a reviewer
-should understand before reading the diff. -->
+## Acceptance criteria
+<!-- Checkable conditions that define "done". Check each box you've satisfied. -->
+- [ ]
+- [ ]
 
-## How to test
+## Testing
+<!-- How was this verified? Commands run, manual steps, what passed. -->
+- [ ] Tests added/updated
+- [ ] All tests pass locally
+- [ ] Manually verified
 
-<!-- Concrete steps a reviewer can follow to verify this works. Include any setup,
-commands, test data, or URLs. If automated tests cover it, say which ones. -->
 
-## Screenshots / recordings
+## Risk & rollback
+<!-- Blast radius if this breaks. How to revert. Migrations/config/secrets touched? -->
+- Risk:
+- Rollback:
 
-<!-- For UI changes. Delete this section if not applicable. -->
+## Screenshots / output
+<!-- UI changes, CLI output, before/after. Delete if N/A. -->
+
 
 ## Checklist
-
-- [ ] Tests added or updated (or noted N/A with reason)
-- [ ] Docs updated where relevant (README, inline comments, ADR) — or N/A
-- [ ] Manual verification completed
-- [ ] No secrets, credentials, or `.env` values in the diff
-- [ ] Breaking changes called out above (or N/A)
-
-## Notes for reviewer
-
-<!-- Anything specific to call attention to: known limitations, follow-ups, areas
-you'd most like feedback on. -->
+- [ ] Scope is focused (one logical change)
+- [ ] No secrets, keys, or credentials committed
+- [ ] Docs/README updated if behavior changed
+- [ ] Linked issue and labels applied
