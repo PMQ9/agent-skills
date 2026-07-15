@@ -1,0 +1,51 @@
+{
+  "skill_name": "security-pr-review",
+  "evals": [
+    {
+      "id": 0,
+      "name": "flask-user-api",
+      "prompt": "Do a security review of PR #101. The full diff is saved at pr-101-user-api.diff in this directory. Write the review to security-review.md.",
+      "expected_output": "A security review using the mandatory template (Security Reviewer + Model fields filled). Must catch: SQL injection in /api/users/search, hardcoded API key/secret, MD5 password hashing, missing authorization/IDOR on delete_user and get_user, debug=True in production, and leaking SSN + the API key in responses.",
+      "files": ["pr-101-user-api.diff"],
+      "assertions": [
+        {"text": "Output follows the mandatory template with a 'Security Reviewer:' field and a 'Model:' field both filled in with concrete values"},
+        {"text": "Identifies the SQL injection in /api/users/search (string-concatenated LIKE query)"},
+        {"text": "Flags the hardcoded API key sk_live_... as a committed secret and recommends rotation"},
+        {"text": "Flags MD5 used for password hashing as a crypto/auth weakness"},
+        {"text": "Flags missing authorization / IDOR on the delete and get-user endpoints"},
+        {"text": "Notes debug=True in production as a finding"},
+        {"text": "Assigns severities (at least one Critical or High) and gives a merge verdict"}
+      ]
+    },
+    {
+      "id": 1,
+      "name": "node-link-preview",
+      "prompt": "Security-review PR #214 for me before I merge it. The diff is in pr-214-link-preview.diff. Save the review as security-review.md.",
+      "expected_output": "A security review using the mandatory template. Must catch: SSRF in /preview (user-controlled axios.get URL), open redirect in /oauth/callback, XSS in the bookmark card HTML template, sensitive logging of the user's token, permissive CORS (origin:true + credentials), and error stack traces returned to the client.",
+      "files": ["pr-214-link-preview.diff"],
+      "assertions": [
+        {"text": "Output follows the mandatory template with 'Security Reviewer:' and 'Model:' fields filled in"},
+        {"text": "Identifies the SSRF in the /preview endpoint fetching a user-controlled URL"},
+        {"text": "Identifies the open/unsafe redirect in /oauth/callback using returnTo"},
+        {"text": "Identifies the XSS in the bookmark card built via string interpolation"},
+        {"text": "Flags the sensitive logging of the user's token"},
+        {"text": "Flags the permissive CORS config (origin:true with credentials)"},
+        {"text": "Flags returning e.stack to the client as sensitive data exposure"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "flask-avatar-upload",
+      "prompt": "Can you check this PR for security problems? It's PR #330, adds avatar uploads and settings import. Diff is at pr-330-avatar-upload.diff. Write your review to security-review.md.",
+      "expected_output": "A security review using the mandatory template. Must catch: unsafe file upload (trusts original filename, stores in webroot, no type/size validation), path traversal in /avatar/get, insecure deserialization via yaml.load on uploaded data, and ideally the missing SameSite/attributes on the theme cookie.",
+      "files": ["pr-330-avatar-upload.diff"],
+      "assertions": [
+        {"text": "Output follows the mandatory template with 'Security Reviewer:' and 'Model:' fields filled in"},
+        {"text": "Identifies the unsafe file upload (trusts original filename, no content-type/size validation, stored under webroot)"},
+        {"text": "Identifies the path traversal in /avatar/get via the name parameter"},
+        {"text": "Identifies the insecure deserialization via yaml.load on uploaded file contents"},
+        {"text": "Assigns severities and gives a clear merge verdict (request changes / block)"}
+      ]
+    }
+  ]
+}

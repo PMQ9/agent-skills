@@ -1,0 +1,53 @@
+PR #588: Paginate search results and gate premium results behind entitlement
+
+Description: Return one page of results (pageSize items). Premium results should
+only be included when the user has an active premium entitlement. Log and skip
+any result that fails to render, so one bad row can't break the page.
+
+--- a/src/search/results.ts
++++ b/src/search/results.ts
+@@ -1,20 +1,48 @@
+ export interface Result { id: string; title: string; premium: boolean; }
+
+-export function getResults(all: Result[]): Result[] {
+-  return all;
++export function getPage(
++  all: Result[],
++  page: number,
++  pageSize: number,
++  user: { premiumUntil?: number }
++): Result[] {
++  const visible = all.filter((r) => {
++    // hide premium results unless the user is entitled
++    if (!r.premium) return true;
++    return user.premiumUntil && user.premiumUntil < Date.now();
++  });
++
++  const start = page * pageSize;
++  const end = start + pageSize;
++  const pageItems = visible.slice(start, end + 1);
++
++  const rendered: Result[] = [];
++  for (const item of pageItems) {
++    try {
++      rendered.push(renderRow(item));
++    } catch (e) {
++      // skip bad rows
++    }
++  }
++  return rendered;
+ }
+
++function renderRow(r: Result): Result {
++  return { ...r, title: r.title.trim() };
++}
+
+--- a/src/search/handler.ts
++++ b/src/search/handler.ts
+@@ -8,7 +8,9 @@ export async function handler(req, res) {
+   const all = await store.fetchAll();
+-  res.json(getResults(all));
++  const page = Number(req.query.page);
++  const results = getPage(all, page, 20, req.user);
++  res.json(results);
+ }

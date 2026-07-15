@@ -1,0 +1,45 @@
+PR #412: Add cart discount + average-item-price to checkout summary
+
+Description: Checkout summary should show the average price per item and apply a
+percentage discount code. Discounts are capped at 90%.
+
+--- a/checkout/pricing.py
++++ b/checkout/pricing.py
+@@ -10,14 +10,31 @@ class Cart:
+     def __init__(self, items):
+         self.items = items  # list of {"name": str, "price_cents": int, "qty": int}
+
+-    def subtotal_cents(self):
+-        return sum(i["price_cents"] * i["qty"] for i in self.items)
++    def subtotal_cents(self):
++        return sum(i["price_cents"] * i["qty"] for i in self.items)
++
++    def average_item_price(self):
++        # average price per line item, in dollars
++        total = self.subtotal_cents()
++        return (total / len(self.items)) / 100
++
++    def apply_discount(self, subtotal_cents, percent):
++        # percent is a user-supplied discount, e.g. 15 for 15% off
++        discount = subtotal_cents * (percent / 100)
++        return subtotal_cents - discount
+
+     def summary(self, discount_percent=0):
+         subtotal = self.subtotal_cents()
+-        return {"subtotal_cents": subtotal}
++        total = self.apply_discount(subtotal, discount_percent)
++        return {
++            "subtotal_cents": subtotal,
++            "total_cents": total,
++            "avg_item_price": self.average_item_price(),
++            "currency": "USD",
++        }
+
+--- a/checkout/api.py
++++ b/checkout/api.py
+@@ -22,6 +22,10 @@ def get_summary(request):
+     cart = Cart(request.session.get("cart_items"))
+-    return json_response(cart.summary())
++    code = request.GET.get("discount")
++    percent = int(code) if code else 0
++    return json_response(cart.summary(discount_percent=percent))

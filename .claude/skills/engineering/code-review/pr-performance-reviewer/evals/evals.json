@@ -1,0 +1,23 @@
+{
+  "skill_name": "performance-pr-reviewer",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Review this diff for performance. It's a new dashboard endpoint that lists recent open orders.\n\n<diff>\n@@ new function list_recent_orders in api/orders.py @@\ndef list_recent_orders(request):\n    orders = Order.objects.filter(status=\"open\").order_by(\"-created_at\")[:200]\n    payload = []\n    for order in orders:\n        customer = Customer.objects.get(id=order.customer_id)\n        item_count = LineItem.objects.filter(order_id=order.id).count()\n        other_open = Order.objects.filter(customer_id=order.customer_id, status=\"open\").all()\n        if len(other_open) == 0:\n            continue\n        payload.append({\"id\": order.id, \"customer_name\": customer.name, \"item_count\": item_count, \"total\": order.total})\n    return JsonResponse({\"orders\": payload})\n</diff>",
+      "expected_output": "A filled-in review using the template with Performance Reviewer + model header. Should flag: N+1 on Customer.objects.get inside the loop (Critical), N+1 / repeated DB call on LineItem count inside the loop, and the other_open query inside the loop using len() on a full fetch (expensive DB + should be existence check, batched). Should give concrete batched-query fixes. Should NOT suggest architecture/redesign.",
+      "files": ["evals/diffs/orders_endpoint.diff"]
+    },
+    {
+      "id": 1,
+      "prompt": "Can you do a performance review of this TypeScript change? It builds monthly reports and is called straight from an HTTP handler.\n\n<diff>\nexport async function buildMonthlyReport(accountIds: string[]) {\n  const results: Report[] = [];\n  for (const id of accountIds) {\n    const user = await fetchUser(id);\n    const invoice = await fetchInvoice(id);\n    results.push(renderReport(user, invoice));\n  }\n  const template = fs.readFileSync(\"./templates/report.html\", \"utf-8\");\n  for (const r of results) {\n    fs.writeFileSync(`./out/${r.accountId}.html`, applyTemplate(template, r));\n  }\n  return results;\n}\nexport async function handler(req, res) {\n  const report = await buildMonthlyReport(req.body.accountIds);\n  res.json(report);\n}\n</diff>",
+      "expected_output": "Filled template. Should flag: sequential awaits serializing independent fetchUser/fetchInvoice across accounts (async misuse — use Promise.all), synchronous fs.readFileSync/writeFileSync blocking the event loop inside a request handler (blocking I/O), and that the two independent fetches per account could be awaited concurrently. Fixes at implementation level (Promise.all, async fs). No redesign talk.",
+      "files": ["evals/diffs/sync_worker.diff"]
+    },
+    {
+      "id": 2,
+      "prompt": "Here's a reconcile function I just wrote — review it for performance please.\n\n<diff>\ndef reconcile(transactions_path, ledger_entries):\n    rows = open(transactions_path).read().splitlines()\n    transactions = [parse_txn(line) for line in rows]\n    matched = []\n    for entry in ledger_entries:\n        for txn in transactions:\n            if txn.reference == entry.reference:\n                fee = compute_fee(entry.amount, load_fee_schedule())\n                matched.append((entry, txn, fee))\n                break\n    return matched\n\ndef load_fee_schedule():\n    return db.query(\"SELECT tier, rate FROM fee_schedule\")\n</diff>",
+      "expected_output": "Filled template. Should flag: O(n*m) nested loop matching by reference that should be a dict keyed by reference (expensive loop), load_fee_schedule() called inside the inner loop hitting the DB on every match — should be hoisted/cached once (repeated DB call + caching), and reading the whole transactions file into memory via .read() (memory). Concrete fixes. No architecture redesign.",
+      "files": ["evals/diffs/matching.diff"]
+    }
+  ]
+}

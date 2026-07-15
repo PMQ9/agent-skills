@@ -1,0 +1,26 @@
+{
+  "skill_name": "pr-testing-reviewer",
+  "evals": [
+    {
+      "id": 0,
+      "name": "pricing-untested-branches",
+      "prompt": "Review the tests in this change for quality before I merge it. The change is in pricing.py (adds a bulk discount tier and fixes an empty-cart crash) and its tests are in test_pricing.py. Both files are in the folder I gave you. Are these tests actually good enough, and would they catch a regression? Give me a proper test review.",
+      "expected_output": "Identifies: empty-cart branch untested (the fix itself), bulk-discount >=10 boundary untested, HALF discount code untested, and the vacuous `assert result is not None` assertion. Uses the Test Reviewer template with a coverage map. Verdict Request changes.",
+      "files": ["fixtures/case1-pricing/pricing.py", "fixtures/case1-pricing/test_pricing.py"]
+    },
+    {
+      "id": 1,
+      "name": "dateutil-brittle-tests",
+      "prompt": "Can you look at session.test.js and tell me if the tests are any good? The code under test is session.js (session-expiry helpers). I'm worried these tests are flaky. Do a testing review.",
+      "expected_output": "Flags brittleness: wall-clock `new Date()` dependence, exact float equality `toBe(30)`, and time-drift concerns. Flags vacuous `expect(result).toBeDefined()`. Notes missing boundary (exactly at ttl, > vs >=) and missing minutesRemaining-clamps-to-0 case. Uses the template.",
+      "files": ["fixtures/case2-dateutil/session.js", "fixtures/case2-dateutil/session.test.js"]
+    },
+    {
+      "id": 2,
+      "name": "notifier-uncovered-failure-modes",
+      "prompt": "Review PR test coverage for notifier.py and test_notifier.py in the folder I shared. This PR added retry logic and error handling. Are the important paths tested? Write up a test review I can paste on the PR.",
+      "expected_output": "Identifies uncovered failure modes: retry-on-ConnectionError path untested, NotificationError-after-all-retries untested, empty-message skip (returns False) untested. Flags over-mocking (asserts mock called, not that the correct payload/user was posted). Uses the template with coverage map. Verdict Request changes.",
+      "files": ["fixtures/case3-apihandler/notifier.py", "fixtures/case3-apihandler/test_notifier.py"]
+    }
+  ]
+}

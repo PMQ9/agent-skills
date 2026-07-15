@@ -28,6 +28,12 @@ Picking rules:
 | ai-solution-architect | [.claude/skills/engineering/architecture/ai-solution-architect/SKILL.md](.claude/skills/engineering/architecture/ai-solution-architect/SKILL.md) | High-level design of AI-integrated systems — whether to use AI at all, integration pattern (thin wrapper, RAG, agent, structured extraction), quality/latency/cost/privacy/reliability tradeoffs, vague "use AI" mandates, v1 architecture. Sits above the Engineering / AI implementation skills. |
 | api-design | [.claude/skills/engineering/architecture/api-design/SKILL.md](.claude/skills/engineering/architecture/api-design/SKILL.md) | Designing or reviewing HTTP APIs — REST, RPC, GraphQL, gRPC, webhooks; resource modeling, status codes, pagination, versioning, idempotency, rate limiting, OpenAPI. |
 
+### Engineering / Full-Stack
+
+| Skill | Path | Use when |
+|---|---|---|
+| full-stack-engineer | [.claude/skills/engineering/full-stack/full-stack-engineer/SKILL.md](.claude/skills/engineering/full-stack/full-stack-engineer/SKILL.md) | End-to-end, cross-layer work — carrying a feature or whole app from database to UI and into production, wiring frontend↔backend, deciding where logic belongs, threading auth through every layer, choosing a coherent stack. The generalist's skill; hand off to the single-layer skills for depth. |
+
 ### Engineering / Backend
 
 | Skill | Path | Use when |
@@ -78,6 +84,17 @@ Picking rules:
 | kubernetes-helm-gitops | [.claude/skills/engineering/devops/kubernetes-helm-gitops/SKILL.md](.claude/skills/engineering/devops/kubernetes-helm-gitops/SKILL.md) | Kubernetes manifests (Deployments/StatefulSets/Jobs), Helm charts, Argo CD / Flux, HPA/VPA/PDB, RBAC, network policies, ingress, debugging stuck rollouts and CrashLoopBackOff. |
 | pr-description-writer | [.claude/skills/engineering/devops/pr-description-writer/SKILL.md](.claude/skills/engineering/devops/pr-description-writer/SKILL.md) | Drafting pull-request descriptions and (with the user's go-ahead) opening the PR via `gh`. Picks from six templates (feature, bugfix, refactor, docs, chore, hotfix), starts every body with a plain-language TLDR, supports optional Checklist and Links sections, and never pushes or creates a PR without explicit approval. |
 
+### Engineering / Code Review
+
+| Skill | Path | Use when |
+|---|---|---|
+| pr-correctness-reviewer | [.claude/skills/engineering/code-review/pr-correctness-reviewer/SKILL.md](.claude/skills/engineering/code-review/pr-correctness-reviewer/SKILL.md) | Reviewing a PR/diff for bugs — logic errors, missed edge cases, null/undefined handling, off-by-one, race conditions, input-validation and error-handling gaps, business-rule violations, regressions. Fetches the diff with `gh`. |
+| pr-security-review | [.claude/skills/engineering/code-review/pr-security-review/SKILL.md](.claude/skills/engineering/code-review/pr-security-review/SKILL.md) | Security review of a PR — untrusted input to dangerous sinks, authn/authz (IDOR/BOLA), injection, XSS, CSRF/CORS, secrets, file uploads, SSRF, unsafe redirects, deserialization, crypto, PII, audit logging. |
+| pr-performance-reviewer | [.claude/skills/engineering/code-review/pr-performance-reviewer/SKILL.md](.claude/skills/engineering/code-review/pr-performance-reviewer/SKILL.md) | Performance review of a PR — N+1 queries, repeated/unnecessary DB calls, expensive loops, wasteful allocations, async misuse, blocking I/O on hot paths, missed caching. Stays at the implementation level. |
+| pr-architecture-review | [.claude/skills/engineering/code-review/pr-architecture-review/SKILL.md](.claude/skills/engineering/code-review/pr-architecture-review/SKILL.md) | Architecture/design review of a PR — mixed responsibilities, leaky layering, tight coupling, broken abstraction boundaries, poor API/contract design, disorganized code. Stays at the design level. |
+| pr-testing-reviewer | [.claude/skills/engineering/code-review/pr-testing-reviewer/SKILL.md](.claude/skills/engineering/code-review/pr-testing-reviewer/SKILL.md) | Test-quality review of a PR — what isn't tested, missing edge cases and failure modes, vacuous vs meaningful assertions, brittle tests, how easily the code could regress uncaught. |
+| pr-devops-reliability-reviewer | [.claude/skills/engineering/code-review/pr-devops-reliability-reviewer/SKILL.md](.claude/skills/engineering/code-review/pr-devops-reliability-reviewer/SKILL.md) | DevOps/operations/reliability review of a PR — Dockerfiles, K8s/Helm, Terraform, CI/CD, env vars, secrets, migrations, feature flags, timeouts/retries/circuit breakers, logging/metrics/tracing, rollout/rollback safety. |
+
 ### Engineering / Testing
 
 | Skill | Path | Use when |
@@ -91,6 +108,12 @@ Picking rules:
 |---|---|---|
 | observability | [.claude/skills/engineering/reliability/observability/SKILL.md](.claude/skills/engineering/reliability/observability/SKILL.md) | Logs, metrics, traces, alerts, dashboards, SLIs/SLOs/error budgets — OpenTelemetry, Prometheus, Grafana/Loki/Tempo, Jaeger, Datadog, Honeycomb, structured logging, cardinality. |
 | resilience-patterns | [.claude/skills/engineering/reliability/resilience-patterns/SKILL.md](.claude/skills/engineering/reliability/resilience-patterns/SKILL.md) | Behavior under failure — timeouts, retries, backoff/jitter, circuit breakers, bulkheads, rate limiting, load shedding, idempotency, graceful degradation, queues/back-pressure, sagas, DLQs. |
+
+### Engineering / Release
+
+| Skill | Path | Use when |
+|---|---|---|
+| prc-creator | [.claude/skills/engineering/release/prc-creator/SKILL.md](.claude/skills/engineering/release/prc-creator/SKILL.md) | Product Readiness Checklist — evidence-backed go/no-go across architecture, reliability, scalability, security, data & privacy, testing, observability, release, and ownership before a product/feature/service ships. "Are we ready to launch," production readiness, PRR, launch checklist, go/no-go. |
 
 ### Engineering / Security
 

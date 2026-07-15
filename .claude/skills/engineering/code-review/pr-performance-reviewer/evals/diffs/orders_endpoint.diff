@@ -1,0 +1,32 @@
+diff --git a/api/orders.py b/api/orders.py
+index 1a2b3c4..5d6e7f8 100644
+--- a/api/orders.py
++++ b/api/orders.py
+@@ -10,6 +10,28 @@ from .models import Order, Customer, LineItem
+ from .serializers import serialize_order
+
+
++def list_recent_orders(request):
++    """Return recent orders with customer name and item count for the dashboard."""
++    orders = Order.objects.filter(status="open").order_by("-created_at")[:200]
++
++    payload = []
++    for order in orders:
++        customer = Customer.objects.get(id=order.customer_id)
++        item_count = LineItem.objects.filter(order_id=order.id).count()
++
++        # skip orders whose customer has no other open orders
++        other_open = Order.objects.filter(
++            customer_id=order.customer_id, status="open"
++        ).all()
++        if len(other_open) == 0:
++            continue
++
++        payload.append({
++            "id": order.id,
++            "customer_name": customer.name,
++            "item_count": item_count,
++            "total": order.total,
++        })
++
++    return JsonResponse({"orders": payload})

@@ -3,6 +3,8 @@
 .gitignore
 
 # Per-skill workspace artifacts from skill development / eval runs
+# Any *-workspace/ dir (skill-dev / eval scratch), anywhere in the tree
+*-workspace/
 .claude/skills/engineering/backend/**/*.json
 .claude/skills/engineering/backend/api-design-workspace/**/*.md
 .claude/skills/engineering/backend/api-design-workspace/**/*.html

@@ -1,0 +1,33 @@
+diff --git a/services/report.ts b/services/report.ts
+index aaa111..bbb222 100644
+--- a/services/report.ts
++++ b/services/report.ts
+@@ -3,6 +3,32 @@ import fs from "fs";
+ import { fetchUser, fetchInvoice } from "./api";
+
++// Build a monthly report for every account. Called from the HTTP handler.
++export async function buildMonthlyReport(accountIds: string[]) {
++  const results: Report[] = [];
++
++  for (const id of accountIds) {
++    // pull the account's user and latest invoice
++    const user = await fetchUser(id);
++    const invoice = await fetchInvoice(id);
++    results.push(renderReport(user, invoice));
++  }
++
++  // load the email template from disk on every call
++  const template = fs.readFileSync("./templates/report.html", "utf-8");
++
++  // write each report to disk
++  for (const r of results) {
++    fs.writeFileSync(`./out/${r.accountId}.html`, applyTemplate(template, r));
++  }
++
++  return results;
++}
++
++export async function handler(req, res) {
++  const report = await buildMonthlyReport(req.body.accountIds);
++  res.json(report);
++}

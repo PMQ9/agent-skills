@@ -1,0 +1,54 @@
+PR #731: Refactor expireSubscriptions + change getUser return shape
+
+Description: Clean up the subscription expiry job so it removes expired
+subscriptions during the sweep. Also change getUser to return the user object
+directly instead of wrapping it in { user, found }, since every caller just reads
+.user anyway.
+
+--- a/billing/subscriptions.js
++++ b/billing/subscriptions.js
+@@ -14,12 +14,15 @@ class SubscriptionManager {
+     this.subs = subs; // Map<userId, { expiresAt: number, plan: string }>
+   }
+
+-  expireSubscriptions(now) {
+-    const expired = [];
+-    for (const [userId, sub] of this.subs) {
+-      if (sub.expiresAt < now) expired.push(userId);
+-    }
+-    for (const userId of expired) this.subs.delete(userId);
+-    return expired;
++  expireSubscriptions(now) {
++    const expired = [];
++    for (const [userId, sub] of this.subs) {
++      if (sub.expiresAt < now) {
++        expired.push(userId);
++        this.subs.delete(userId);
++      }
++    }
++    return expired;
+   }
+ }
+
+--- a/billing/users.js
++++ b/billing/users.js
+@@ -3,9 +3,9 @@ const db = require("./db");
+
+ async function getUser(id) {
+   const row = await db.findUser(id);
+-  return { user: row, found: row !== null };
++  return row;
+ }
+
+ module.exports = { getUser };
+
+--- a/billing/report.js
++++ b/billing/report.js
+@@ -5,7 +5,8 @@ const { getUser } = require("./users");
+ async function buildReport(id) {
+   const result = await getUser(id);
+-  if (!result.found) return null;
+-  return { name: result.user.name, id: result.user.id };
++  if (!result.found) return null;
++  return { name: result.user.name, id: result.user.id };
+ }

@@ -1,0 +1,21 @@
+@@ changed file data/report_repo.ts @@
+ export class ReportRepository {
+-  async recentForUser(userId: string): Promise<Report[]> {
+-    const rows = await this.db.query("SELECT * FROM reports WHERE user_id = $1", [userId]);
+-    return rows.map(toReport);
+-  }
++  // now returns the raw query builder so callers can add filters
++  recentForUser(userId: string): QueryBuilder<ReportRow> {
++    return this.db.table("reports").where("user_id", userId);
++  }
+ }
+
+@@ changed file api/report_handler.ts @@
+ export async function getReports(req, res) {
+-  const reports = await repo.recentForUser(req.user.id);
+-  res.json(reports);
++  const qb = repo.recentForUser(req.user.id);
++  if (req.query.since) qb.where("created_at", ">", req.query.since);
++  const rows = await qb.orderBy("created_at", "desc").limit(50);
++  res.json(rows);
+ }

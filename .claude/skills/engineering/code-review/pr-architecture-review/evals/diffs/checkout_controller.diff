@@ -1,0 +1,29 @@
+@@ new file web/checkout.py @@
++from django.http import HttpResponse, JsonResponse
++import json
++
++def checkout(request):
++    body = json.loads(request.body)
++    items = body["items"]
++    if not items:
++        return HttpResponse("empty cart", status=400)
++
++    subtotal = 0
++    for it in items:
++        row = db.execute("SELECT price FROM products WHERE sku = %s", it["sku"])
++        subtotal += row[0]["price"] * it["qty"]
++
++    # loyalty discount rule
++    customer = db.execute("SELECT tier FROM customers WHERE id = %s", body["customer_id"])
++    if customer[0]["tier"] == "gold":
++        subtotal = subtotal * 0.9
++    elif customer[0]["tier"] == "silver":
++        subtotal = subtotal * 0.95
++
++    tax = subtotal * 0.0825
++    total = subtotal + tax
++
++    db.execute("INSERT INTO orders (customer_id, total) VALUES (%s, %s)",
++               body["customer_id"], total)
++
++    return JsonResponse({"total": total, "tax": tax})

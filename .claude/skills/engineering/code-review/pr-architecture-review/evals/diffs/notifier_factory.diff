@@ -1,0 +1,25 @@
+@@ new file notifications/factory.py @@
++from abc import ABC, abstractmethod
++
++class NotificationStrategy(ABC):
++    @abstractmethod
++    def send(self, user, message): ...
++
++class EmailNotificationStrategy(NotificationStrategy):
++    def send(self, user, message):
++        smtp = SmtpClient("smtp.internal", 25)
++        smtp.deliver(user.email, message)
++
++class NotificationStrategyFactory:
++    def create(self, kind: str) -> NotificationStrategy:
++        if kind == "email":
++            return EmailNotificationStrategy()
++        raise ValueError(f"unknown kind {kind}")
++
++class NotificationManager:
++    def __init__(self):
++        self.factory = NotificationStrategyFactory()
++
++    def notify(self, user, message):
++        strategy = self.factory.create("email")   # only ever "email"
++        strategy.send(user, message)

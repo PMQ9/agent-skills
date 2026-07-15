@@ -1,0 +1,36 @@
+diff --git a/lib/reconcile.py b/lib/reconcile.py
+index ccc333..ddd444 100644
+--- a/lib/reconcile.py
++++ b/lib/reconcile.py
+@@ -5,6 +5,34 @@ import csv
+ from decimal import Decimal
+
+
++def reconcile(transactions_path, ledger_entries):
++    """Match each ledger entry to a transaction and compute fees."""
++    # load the full transaction file into memory
++    rows = open(transactions_path).read().splitlines()
++    transactions = [parse_txn(line) for line in rows]
++
++    matched = []
++    for entry in ledger_entries:
++        # find the transaction with the same reference
++        for txn in transactions:
++            if txn.reference == entry.reference:
++                fee = compute_fee(entry.amount, load_fee_schedule())
++                matched.append((entry, txn, fee))
++                break
++
++    return matched
++
++
++def load_fee_schedule():
++    # reads the fee table from the database
++    return db.query("SELECT tier, rate FROM fee_schedule")
++
++
++def compute_fee(amount, schedule):
++    for tier, rate in schedule:
++        if amount <= tier:
++            return amount * rate
++    return amount * schedule[-1][1]

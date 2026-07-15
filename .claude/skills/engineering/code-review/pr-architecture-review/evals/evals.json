@@ -1,0 +1,23 @@
+{
+  "skill_name": "pr-architecture-review",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Review this diff for architecture. It's a new checkout endpoint.\n\n<diff>\ndef checkout(request):\n    body = json.loads(request.body)\n    items = body[\"items\"]\n    if not items:\n        return HttpResponse(\"empty cart\", status=400)\n    subtotal = 0\n    for it in items:\n        row = db.execute(\"SELECT price FROM products WHERE sku = %s\", it[\"sku\"])\n        subtotal += row[0][\"price\"] * it[\"qty\"]\n    customer = db.execute(\"SELECT tier FROM customers WHERE id = %s\", body[\"customer_id\"])\n    if customer[0][\"tier\"] == \"gold\":\n        subtotal = subtotal * 0.9\n    elif customer[0][\"tier\"] == \"silver\":\n        subtotal = subtotal * 0.95\n    tax = subtotal * 0.0825\n    total = subtotal + tax\n    db.execute(\"INSERT INTO orders (customer_id, total) VALUES (%s, %s)\", body[\"customer_id\"], total)\n    return JsonResponse({\"total\": total, \"tax\": tax})\n</diff>",
+      "expected_output": "A filled-in review using the template with Architecture Reviewer + model header. Should flag: separation of concerns (one handler parses the request, applies pricing/discount/tax business rules, and does persistence — Critical/Major); layering / responsibilities (the loyalty discount and tax rules are business logic living in the web controller and should move to a service/domain layer where they can be tested and reused). Should give concrete design fixes (extract a pricing/order service, controller only shapes in/out). Should NOT mention the N+1 query in the loop or any performance/micro-optimization — that is explicitly out of scope.",
+      "files": ["evals/diffs/checkout_controller.diff"]
+    },
+    {
+      "id": 1,
+      "prompt": "Can you do an architecture review of this TypeScript change to our report repository?\n\n<diff>\n// data/report_repo.ts\n-  async recentForUser(userId: string): Promise<Report[]> {\n-    const rows = await this.db.query(\"SELECT * FROM reports WHERE user_id = $1\", [userId]);\n-    return rows.map(toReport);\n-  }\n+  recentForUser(userId: string): QueryBuilder<ReportRow> {\n+    return this.db.table(\"reports\").where(\"user_id\", userId);\n+  }\n// api/report_handler.ts\n+  const qb = repo.recentForUser(req.user.id);\n+  if (req.query.since) qb.where(\"created_at\", \">\", req.query.since);\n+  const rows = await qb.orderBy(\"created_at\", \"desc\").limit(50);\n</diff>",
+      "expected_output": "Filled template. Should flag: abstraction boundary leak (the repository now returns a live QueryBuilder instead of domain Report objects, so the API handler is coupled to the query-builder/ORM — Critical/Major); layering (query construction has leaked up into the web handler); API/contract design (return type changed from domain data to an implementation detail, a breaking change to the repository contract). Fix: keep the repository returning domain data and push filter options in as parameters, or add explicit query methods. No performance/micro-optimization notes.",
+      "files": ["evals/diffs/report_repo.diff"]
+    },
+    {
+      "id": 2,
+      "prompt": "Here's a notifications module I just wrote — architecture review please.\n\n<diff>\nclass NotificationStrategy(ABC):\n    @abstractmethod\n    def send(self, user, message): ...\nclass EmailNotificationStrategy(NotificationStrategy):\n    def send(self, user, message):\n        smtp = SmtpClient(\"smtp.internal\", 25)\n        smtp.deliver(user.email, message)\nclass NotificationStrategyFactory:\n    def create(self, kind):\n        if kind == \"email\": return EmailNotificationStrategy()\n        raise ValueError(kind)\nclass NotificationManager:\n    def __init__(self):\n        self.factory = NotificationStrategyFactory()\n    def notify(self, user, message):\n        strategy = self.factory.create(\"email\")\n        strategy.send(user, message)\n</diff>",
+      "expected_output": "Filled template. Should flag: over-engineering / maintainability (a full strategy + factory scaffold for a single 'email' case that has no second implementation — premature abstraction, collapse to a simple function or one class until a second channel exists); coupling (SmtpClient host/port hard-wired inside the strategy and constructed internally — should be injected so it can be tested/swapped); responsibilities (NotificationManager constructs its own factory, hiding the dependency). Should treat over-engineering as a real finding. No performance/micro-optimization notes.",
+      "files": ["evals/diffs/notifier_factory.diff"]
+    }
+  ]
+}

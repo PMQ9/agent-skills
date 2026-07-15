@@ -1,0 +1,44 @@
+{
+  "skill_name": "correctness-reviewer",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Review this PR diff for correctness before I merge it. The file is pr_pricing.diff. Give me the full review.",
+      "expected_output": "A correctness review using the template that catches the empty-cart division by zero, the null/None cart_items from session, the missing 90% discount cap / percent validation, the int(discount) parse that can throw, and the money-as-float rounding issue.",
+      "files": ["evals/files/pr_pricing.diff"],
+      "expectations": [
+        "Flags the division-by-zero / crash when the cart is empty in average_item_price (total / len(self.items))",
+        "Flags that cart_items from session can be None/missing and is passed to Cart unguarded",
+        "Flags that the 90% discount cap is not enforced / discount percent is not validated (can exceed 100 or be negative)",
+        "Flags that int(code) on the discount query param can throw / is unvalidated user input",
+        "Notes the money-handled-as-float rounding problem in apply_discount / total_cents",
+        "Uses the review template: output contains 'Correctness Reviewer' and a Model field identifying the reviewing model",
+        "Assigns severity levels to findings (e.g. Critical/Major/Minor) and gives a merge verdict"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "Can you bug-hunt this diff for me? It's pr_pagination.diff. I want to know what could break in production.",
+      "expected_output": "A correctness review that catches the inverted premium-entitlement condition (leaks premium content / wrong comparison direction), the off-by-one slice(start, end+1), the empty catch that swallows errors without logging, and the unvalidated NaN page number.",
+      "files": ["evals/files/pr_pagination.diff"],
+      "expectations": [
+        "Flags the inverted premium entitlement check (user.premiumUntil < Date.now() shows premium to expired/unentitled users instead of active ones)",
+        "Flags the off-by-one in slice(start, end + 1) returning pageSize+1 items / overlapping pages",
+        "Flags the empty catch block swallowing render errors with no logging (spec required logging)",
+        "Flags that Number(req.query.page) can be NaN and is used unvalidated in slice bounds",
+        "Uses the review template: output contains 'Correctness Reviewer' and a Model field identifying the reviewing model"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Review pr_subscriptions.diff for correctness. Focus on whether this change breaks anything that currently works.",
+      "expected_output": "A correctness review that catches the regression: getUser's return shape changed but report.js still reads result.found and result.user, so buildReport always returns null / breaks. Ideally also comments on the Map mutation during iteration.",
+      "files": ["evals/files/pr_subscriptions.diff"],
+      "expectations": [
+        "Catches the regression that buildReport in report.js still uses the old {user, found} shape after getUser was changed to return the row directly, so result.found is undefined and buildReport always returns null",
+        "Identifies this as a Critical/blocking regression affecting an existing caller",
+        "Uses the review template: output contains 'Correctness Reviewer' and a Model field identifying the reviewing model"
+      ]
+    }
+  ]
+}
