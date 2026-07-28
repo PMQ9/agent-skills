@@ -1,10 +1,10 @@
 # Current Threat Landscape
 
 <!-- update-metadata: keep this block at the top; update mode restamps ONLY this block each run (the entry sections below are an append log, never rewritten or deleted) -->
-- **Last updated:** 2026-06-29
+- **Last updated:** 2026-07-28
 - **Updated by:** update news mode (see SKILL.md)
-- **Sources consulted:** CISA KEV, Rapid7, Microsoft
-- **Entries:** 28
+- **Sources consulted:** CISA KEV, Rapid7, Unit 42
+- **Entries:** 35
 
 This file grounds advice in what is actually being exploited right now. It is an append log:
 update mode adds new entries at the top of the relevant section and leaves older ones in place
@@ -17,6 +17,12 @@ blocks. Every entry cites a dated source from the allowlist (`assets/trusted_sou
 
 ## Actively exploited vulnerabilities (CISA KEV and vendor reporting)
 
+- **2026-07-21** — WordPress Core, Langflow & DD-WRT KEV additions (CVE-2026-63030 "wp2shell" interpretation-conflict RCE & CVE-2026-60137 SQL injection in WordPress Core, CVE-2026-0770 Langflow untrusted-functionality inclusion, CVE-2021-27137 DD-WRT stack overflow): four KEV additions on active exploitation. → CMS cores and LLM-app builders are mass-exploited; patch fast and lock down the admin surface. [CISA KEV](https://www.cisa.gov/news-events/alerts/2026/07/21/cisa-adds-four-known-exploited-vulnerabilities-catalog)
+- **2026-07-16** — Microsoft SharePoint Server unauthenticated RCE (CVE-2026-58644): CVSS 9.8 deserialization-of-untrusted-data (CWE-502) flaw gives unauthenticated code execution on on-prem SharePoint 2016/2019/SE, exploited in the wild (ToolShell-style chain also abuses CVE-2026-45659/56164/32201 for IIS machine-key theft); KEV 2026-07-16. → Emergency-patch on-prem SharePoint, enable AMSI, and rotate IIS machine keys after exploitation. [Rapid7](https://www.rapid7.com/blog/post/etr-cve-2026-58644-microsoft-sharepoint-server-unauthenticated-remote-code-execution-vulnerability-exploited-in-the-wild/)
+- **2026-07-15** — SonicWall SMA1000 SSRF→RCE + root LPE (CVE-2026-15409 CVSS 10.0, CVE-2026-15410): unauthenticated /wsproxy SSRF tunnels to localhost services for code execution, then a remove_hotfix path traversal escalates to root; zero-day-exploited as a stealth backdoor into Active Directory, both KEV. → Never expose SMA1000 mgmt to the internet; apply the fixed hotfix and treat exposed appliances as compromised (rotate creds/TOTP). [Rapid7](https://www.rapid7.com/blog/post/etr-rapid7-mdr-team-discovers-new-sonicwall-sma1000-zero-days-being-actively-exploited-cve-2026-15409-cve-2026-15410/)
+- **2026-07-15** — KNX protocol lockout bypass & Oracle E-Business Suite privilege mgmt (CVE-2023-4346, CVE-2026-46817): two KEV additions on active exploitation. → Legacy building-automation protocols and ERP suites stay targeted; patch and restrict exposure. [CISA KEV](https://www.cisa.gov/news-events/alerts/2026/07/15/cisa-adds-two-known-exploited-vulnerabilities-catalog)
+- **2026-07-13** — Cisco IOS cross-site request forgery (CVE-2008-4128): a 2008-era CSRF flaw added to CISA KEV on active exploitation. → Ancient CVEs still get weaponized on unpatched gear; retire or patch legacy network devices. [CISA KEV](https://www.cisa.gov/news-events/alerts/2026/07/13/cisa-adds-one-known-exploited-vulnerability-catalog)
+- **2026-07-07** — Joomla page-builders & Langflow KEV additions (CVE-2026-48908 JoomShaper SP Page Builder dangerous-file upload, CVE-2026-56290 Joomlack Page Builder access control, CVE-2026-55255 Langflow authorization bypass via user-controlled key): three KEV additions. → CMS extensions and LLM-app builders are recurring footholds; patch and restrict editor/admin privileges. [CISA KEV](https://www.cisa.gov/news-events/alerts/2026/07/07/cisa-adds-three-known-exploited-vulnerabilities-catalog)
 - **2026-06-25** — Cisco Unified CM SSRF & PTC Windchill/FlexPLM input validation (CVE-2026-20230, CVE-2026-12569): both added to CISA KEV on active exploitation. → SSRF and weak input validation in enterprise apps stay KEV-worthy; patch on disclosure. [CISA KEV](https://www.cisa.gov/news-events/alerts/2026/06/25/cisa-adds-two-known-exploited-vulnerabilities-catalog)
 - **2026-06-23** — Ubiquiti UniFi OS (CVE-2026-34908 access-control, CVE-2026-34909 path traversal, CVE-2026-34910 input validation) & Lantronix EDS5000 code injection (CVE-2025-67038): four KEV additions. → Keep network/IoT management interfaces off the public internet and patch on disclosure. [CISA KEV](https://www.cisa.gov/news-events/alerts/2026/06/23/cisa-adds-four-known-exploited-vulnerabilities-catalog)
 - **2026-06-16** — Joomla Content Editor improper access control (CVE-2026-48907): added to CISA KEV on active exploitation. → CMS extensions are a recurring foothold; patch and restrict editor privileges. [CISA KEV](https://www.cisa.gov/news-events/alerts/2026/06/16/cisa-adds-one-known-exploited-vulnerability-catalog)
@@ -36,6 +42,7 @@ blocks. Every entry cites a dated source from the allowlist (`assets/trusted_sou
 
 ## AI / coding-assistant security (the fast-moving front)
 
+- **2026-07** — Web-based indirect prompt injection against AI agents seen in the wild (Unit 42): attackers plant hidden instructions in web pages that browsing/agentic LLMs ingest and act on, redirecting tool use. → Treat all model-ingested web content as untrusted input; sandbox agent tools and gate consequential actions on human approval. [Unit 42](https://unit42.paloaltonetworks.com/ai-agent-prompt-injection/)
 - **2026-05-07** — Prompt injection → host RCE in AI agent frameworks (Microsoft Semantic Kernel): a single crafted prompt can launch shell commands on the host running the agent. → Treat agent tool-invocation paths as a sink; sandbox execution and validate tool calls. [Microsoft](https://www.microsoft.com/en-us/security/blog/2026/05/07/prompts-become-shells-rce-vulnerabilities-ai-agent-frameworks/)
 - **2026** — AI-generated code carries ~2.7x more vulnerabilities, concentrated in injection, XSS, hardcoded secrets (~40% more). → Always run the AI-code pass in `ai-assisted-code-risks.md`. [OWASP GenAI](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
 - **2025** — Prompt injection in PR descriptions → RCE via coding assistant (CVE-2025-53773, CVSS 9.6): hidden instructions drove attacker-controlled edits. → Model-fed content is an untrusted boundary; never let generated output reach a sink unchecked. [NVD](https://nvd.nist.gov/)
