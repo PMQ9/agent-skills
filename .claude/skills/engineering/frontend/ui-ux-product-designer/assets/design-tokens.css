@@ -1,0 +1,179 @@
+/* ============================================================================
+   CCC House Style — Design Tokens
+   Vanderbilt College of Connected Computing shared design language.
+   Cool-neutral (Zinc) gray scale + Vanderbilt gold/black brand, WCAG-AA tuned.
+
+   Three ways to consume, pick what matches the project:
+     A) Plain CSS custom properties (framework-agnostic)              — below
+     B) Tailwind v4  @theme inline mapping                           — below
+     C) Tailwind v3  tailwind.config.js theme.extend snippet         — below (in a comment)
+
+   Contrast notes are inline. Body text pairs clear >=4.5:1; large text /
+   non-text UI clear >=3:1. Gold is a metal: use --gold-ink for gold TEXT.
+   ============================================================================ */
+
+/* ---------------------------------------------------------------------------
+   A) CSS custom properties
+   --------------------------------------------------------------------------- */
+:root {
+  /* Structure — light */
+  --background: #ffffff;            /* page canvas */
+  --foreground: #18181b;            /* primary text — 16:1 on card */
+  --card: #ffffff;                  /* elevated surface: cards, modals, header */
+  --card-foreground: #18181b;
+  --popover: #ffffff;
+  --popover-foreground: #18181b;
+  --primary: #18181b;               /* near-black: primary buttons, active pills */
+  --primary-foreground: #fafafa;
+  --secondary: #f4f4f5;             /* subtle fill / wash */
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;      /* secondary/caption text — ~5:1 on white (AA floor) */
+  --accent: #f4f4f5;               /* hover row / soft accent surface */
+  --accent-foreground: #18181b;
+  --border: #e4e4e7;                /* hairlines */
+  --input: #e4e4e7;                 /* control borders */
+  --ring: #71717a;                  /* focus ring — >=3:1 non-text */
+
+  /* Brand — Vanderbilt gold & black */
+  --gold: #f2cc0c;                  /* bright metal: logo, dark-surface accents — NOT text on light */
+  --gold-ink: #b08900;              /* text-safe gold on light — ~5:1 on white, ~4.5:1 on washes */
+  --gold-wash: #f4f4f5;             /* selected/hover wash (neutralized to gray) */
+  --black: #000000;                 /* Vanderbilt Black */
+
+  /* Status — text tone + paired tint bg (all >=4.5:1 on white) */
+  --success: #15803d;   --success-bg: #f0fdf4;
+  --warning: #b45309;   --warning-bg: #fffbeb;
+  --error:   #b91c1c;   --error-bg:   #fef2f2;
+  --info:    #1d4ed8;   --info-bg:    #eff6ff;
+  --destructive: #dc2626;
+  --destructive-foreground: #fafafa;
+
+  /* Charts — categorical series (vary by legend/label too, never color alone) */
+  --chart-1: #e8703a; --chart-2: #3aa0a0; --chart-3: #2e5c8a; --chart-4: #e0b23a; --chart-5: #d98a3a;
+
+  /* Radius */
+  --radius: 0.5rem;                 /* base; cards rounded-xl, controls rounded-md, badges rounded-full */
+
+  /* Typography */
+  --font-sans: "Public Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;  /* display, opt-in */
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #f4f4f5;
+  --card: #18181b;
+  --card-foreground: #f4f4f5;
+  --popover: #18181b;
+  --popover-foreground: #f4f4f5;
+  --primary: #ededed;
+  --primary-foreground: #18181b;
+  --secondary: #27272a;
+  --secondary-foreground: #f4f4f5;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;      /* ~4.6:1 on dark canvas */
+  --accent: #27272a;
+  --accent-foreground: #f4f4f5;
+  --border: #3f3f46;
+  --input: #3f3f46;
+  --ring: #82828c;
+
+  --gold: #f2cc0c;
+  --gold-ink: #e0b93a;              /* lighter gold reads on dark */
+  --gold-wash: #27272a;
+
+  --success: #4ade80; --success-bg: #14321f;
+  --warning: #fbbf24; --warning-bg: #3a2c10;
+  --error:   #f87171; --error-bg:   #3a1616;
+  --info:    #60a5fa; --info-bg:    #16233a;
+  --destructive: #f87171;
+  --destructive-foreground: #18181b;
+}
+
+/* Universal focus ring — every focusable element (WCAG 2.4.7 / 2.4.11) */
+*:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Tabular numerals for money/date/aligned numeric columns */
+.tnum { font-variant-numeric: tabular-nums lining-nums; }
+
+/* De-emphasize with color, never opacity (keeps AA contrast) */
+.row-muted { color: var(--muted-foreground); background: var(--muted); }
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   B) Tailwind v4 — map tokens to utilities (drop into your CSS entry)
+
+   @import "tailwindcss";
+   @custom-variant dark (&:where(.dark, .dark *));
+
+   @theme inline {
+     --color-background: var(--background);
+     --color-foreground: var(--foreground);
+     --color-card: var(--card);
+     --color-card-foreground: var(--card-foreground);
+     --color-primary: var(--primary);
+     --color-primary-foreground: var(--primary-foreground);
+     --color-secondary: var(--secondary);
+     --color-muted: var(--muted);
+     --color-muted-foreground: var(--muted-foreground);
+     --color-accent: var(--accent);
+     --color-border: var(--border);
+     --color-input: var(--input);
+     --color-ring: var(--ring);
+     --color-gold: var(--gold);
+     --color-gold-ink: var(--gold-ink);
+     --color-success: var(--success);
+     --color-warning: var(--warning);
+     --color-error: var(--error);
+     --color-info: var(--info);
+     --color-destructive: var(--destructive);
+     --radius-lg: var(--radius);
+     --radius-md: calc(var(--radius) - 2px);
+     --radius-sm: calc(var(--radius) - 4px);
+     --font-sans: var(--font-sans);
+     --font-serif: var(--font-serif);
+     --font-mono: var(--font-mono);
+   }
+   --------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
+   C) Tailwind v3 — tailwind.config.js  (theme.extend), reading the CSS vars:
+
+   module.exports = {
+     darkMode: 'class',
+     theme: { extend: {
+       colors: {
+         background: 'var(--background)', foreground: 'var(--foreground)',
+         card: 'var(--card)', primary: 'var(--primary)',
+         'primary-foreground': 'var(--primary-foreground)',
+         secondary: 'var(--secondary)', muted: 'var(--muted)',
+         'muted-foreground': 'var(--muted-foreground)',
+         accent: 'var(--accent)', border: 'var(--border)', input: 'var(--input)',
+         ring: 'var(--ring)',
+         gold: 'var(--gold)', 'gold-ink': 'var(--gold-ink)',
+         success: 'var(--success)', warning: 'var(--warning)',
+         error: 'var(--error)', info: 'var(--info)',
+         destructive: 'var(--destructive)',
+       },
+       borderRadius: { lg: 'var(--radius)', md: 'calc(var(--radius) - 2px)', sm: 'calc(var(--radius) - 4px)' },
+       fontFamily: {
+         sans: ['var(--font-sans)'], serif: ['var(--font-serif)'], mono: ['var(--font-mono)'],
+       },
+       boxShadow: { xs: '0 1px 2px 0 rgb(0 0 0 / 0.05)' },  // keep shadows minimal — xs max
+     }},
+   }
+   --------------------------------------------------------------------------- */

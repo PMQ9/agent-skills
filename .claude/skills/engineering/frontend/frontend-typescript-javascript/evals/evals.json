@@ -1,0 +1,54 @@
+{
+  "skill_name": "typescript-javascript",
+  "evals": [
+    {
+      "id": 0,
+      "name": "api-boundary-crash",
+      "prompt": "ok so our internal admin dashboard (next.js app router, ts) keeps throwing \"Cannot read properties of undefined (reading 'toUpperCase')\" in prod but never locally. the component is a user detail panel. here's roughly what we have:\n\n```ts\ninterface UserPanelState {\n  loading?: boolean;\n  user?: User;\n  error?: string;\n}\n\ninterface User {\n  id: string;\n  email: string;\n  displayName: string;\n  role: string;\n  lastLoginAt: Date;\n}\n\nasync function loadUser(id: string) {\n  const res = await fetch(`/api/users/${id}`);\n  const data = await res.json() as User;\n  return data;\n}\n```\n\nand in the component we do `if (state.user) { return <div>{state.user.role.toUpperCase()}</div> }`. the api is a python service another team owns so i cant change what it returns. how do i actually fix this properly, not just slap optional chaining everywhere",
+      "expected_output": "Identifies that `as User` is an unchecked claim and the real fix is runtime parsing at the fetch boundary (Zod or similar, type inferred from schema). Also flags that lastLoginAt is a string over JSON not a Date, and that the optional-field state bag should be a discriminated union so `user` present implies not loading and no error. Working code, not just advice.",
+      "files": [],
+      "assertions": [
+        "Identifies `await res.json() as User` as the root cause \u2014 an unchecked claim \u2014 rather than framing it as a null-safety problem",
+        "Introduces runtime schema validation (Zod, Valibot, ArkType or equivalent) at the fetch boundary",
+        "Derives the TypeScript type from the schema (e.g. z.infer) instead of maintaining a hand-written interface alongside it",
+        "Flags that `lastLoginAt: Date` is wrong because JSON carries a string, and coerces it at the boundary",
+        "Replaces the optional-field state bag with a discriminated union over a status field",
+        "Checks `res.ok` before parsing the response body",
+        "Does not offer optional chaining or non-null assertions as the primary fix"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "js-to-ts-migration-plan",
+      "prompt": "i inherited a node/express service at work - about 120 js files, commonjs, no types at all, jest tests that mostly pass. mix of route handlers, a db layer using knex, and a big utils folder. leadership wants typescript but we cant stop shipping features for a sprint to do it. whats the actual play here? i've done greenfield ts before but never a conversion this size and i dont want to end up with a half-migrated mess that everyone resents",
+      "expected_output": "A phased, incremental plan: checkJs/allowJs first for value with zero churn, coexistence verified through the build/test pipeline, leaf-first conversion order (constants -> domain types -> db layer -> logic -> routes), strictness ratcheted flag by flag with noImplicitAny before strictNullChecks, @ts-expect-error over @ts-ignore with a suppression ratchet in CI, honest placeholders (unknown over invented types), and guardrails so it doesn't slide back. Explicitly avoids a big-bang rewrite.",
+      "files": [],
+      "assertions": [
+        "Recommends incremental coexistence via allowJs rather than a big-bang rewrite or a dedicated migration sprint",
+        "Recommends checkJs (and/or JSDoc types) to get type-checking value before converting any files",
+        "Specifies a leaf-first conversion order \u2014 utilities, constants and domain types before route handlers",
+        "Ratchets strictness flag by flag (noImplicitAny before strictNullChecks) rather than enabling strict globally at the start",
+        "Prefers @ts-expect-error over @ts-ignore, or proposes a suppression count that may only decrease",
+        "Requires `tsc --noEmit` as its own CI gate, noting that transpilers strip types without checking them",
+        "Warns against inventing types for shapes not yet understood, preferring unknown or a narrow partial type"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "async-sync-script",
+      "prompt": "wrote a nightly sync script that pulls records from a vendor api and writes them to postgres. it works but its slow as hell (~22 min for 4000 records) and about once a week it dies with UnhandledPromiseRejection and the cron just reports success anyway. simplified:\n\n```js\nasync function sync() {\n  const ids = await getIdsToSync();\n  const records = [];\n  for (const id of ids) {\n    const r = await fetch(`https://vendor.example.com/api/v2/records/${id}`, {\n      headers: { authorization: `Bearer ${process.env.VENDOR_TOKEN}` }\n    });\n    records.push(await r.json());\n  }\n  records.forEach(async (rec) => {\n    await db.upsertRecord(rec);\n  });\n  console.log('done');\n}\nsync();\n```\n\nvendor rate limits at 20 req/sec. what should this actually look like",
+      "expected_output": "Catches the three real bugs: sequential awaits in the loop (should be bounded-concurrency parallel, capped near the vendor's 20/sec limit, NOT unbounded Promise.all), forEach with an async callback that never awaits (so the writes float and the script reports done before they finish), and the top-level sync() call with no .catch so rejections go unhandled and the cron sees exit 0. Should also add per-request timeout/AbortSignal, retry with backoff for transient failures, and validation of the vendor payload before it reaches the db.",
+      "files": [],
+      "assertions": [
+        "Identifies the sequential awaits inside the for loop as the cause of the ~22 minute runtime",
+        "Identifies `records.forEach(async (rec) => ...)` as never awaited, so writes float and 'done' logs early",
+        "Identifies the un-awaited, un-caught top-level `sync()` call as why cron sees success on failure",
+        "Uses bounded concurrency sized to the vendor's 20 req/sec limit rather than an unbounded Promise.all",
+        "Adds a per-request timeout or AbortSignal so a hung request cannot stall the job",
+        "Adds retry with backoff scoped to transient failures (429/5xx/network) rather than retrying every error",
+        "Checks res.ok and/or validates the vendor payload before writing it to Postgres",
+        "Sets a non-zero process exit code on failure so the cron job reports correctly"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "skill_name": "ui-ux-product-designer",
+  "evals": [
+    {
+      "id": 0,
+      "name": "grants-reviewer-dashboard",
+      "prompt": "I'm building an internal admin tool for our college's research-grants office. Faculty submit grant proposals and our staff reviewers approve or send them back. Design the reviewer's landing page — what should they see the moment they log in? Give me the layout and enough detail that a developer could build it.",
+      "expected_output": "A work-queue-first landing (not a link hub): linkable stat tiles, a queue table of pending proposals with inline review actions, concrete 8px-grid spacing and semantic color tokens, an accessibility pass (contrast/focus/keyboard), empty/loading states, and Tailwind/implementation guidance. Should default to the CCC house style.",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 1,
+      "name": "secondary-appointment-form-flow",
+      "prompt": "Design the form a faculty member fills out to request a secondary appointment at another department. It collects their name, home department, the target department, appointment type, and a CV upload, then gets routed by email to approvers. Walk me through the UX — the flow and what each screen looks like.",
+      "expected_output": "A user flow with the happy path plus error/empty branches, a wireframe/layout, form design following the prefill/labeling doctrine (labels above fields, required marking, CV-upload handling, specific inline errors, one primary action), designed loading/empty/error/success states, a mobile/responsive note, and an accessibility pass. Concrete tokens and sizes throughout.",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 2,
+      "name": "status-badge-component-spec",
+      "prompt": "Across our apps we keep reinventing status badges and they all look slightly different — approved, pending, under review, changes requested, rejected. Give me one proper status-badge component we can standardize on, with the color tokens, so it's consistent everywhere.",
+      "expected_output": "A component spec in a reusable format (variants for each status, all relevant states, radius/type/padding tokens), a status color system with a text tone + paired tint background per status, documented WCAG-AA contrast, a note that status is not conveyed by color alone (icon/label), and cva/Tailwind implementation guidance. Should map onto the CCC house tokens.",
+      "files": [],
+      "assertions": []
+    }
+  ]
+}
