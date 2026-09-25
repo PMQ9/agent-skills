@@ -1,0 +1,168 @@
+{
+  "skill_name": "pr-backend-api-mcp-reviewer",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "mcp-stdio-helpdesk-server",
+      "prompt": "Can you review PR #212 before I merge it? The diff is in mcp_ticket_server.diff \u2014 it's a new MCP server for our helpdesk that people will plug into Claude Desktop. Tell me what needs to change.",
+      "expected_output": "A Backend / API / MCP review using the template that catches the stdio stdout corruption from print(), the api_key tool parameter (and README telling users to paste the key into chat), the readOnlyHint lie on get_ticket that assigns + marks read, the ticket_action mega-tool with polymorphic params and inconsistent keys, path traversal in read_attachment, the unbounded list_tickets output, opaque/unrecoverable errors, and the unguarded hard delete.",
+      "files": [
+        "evals/diffs/mcp_ticket_server.diff"
+      ],
+      "expectations": [
+        "Flags that print() writes to stdout in a stdio MCP server, which corrupts the JSON-RPC protocol stream (logs must go to stderr)",
+        "Flags api_key as a tool parameter (secret passed through the model/transcript) and says credentials should come from the server's environment/config instead",
+        "Flags that get_ticket is annotated readOnlyHint=True but has side effects (assigns the ticket and/or marks it read)",
+        "Flags the ticket_action tool design: free-string action plus untyped/polymorphic params dict with a vague description, recommending separate typed tools or an enum/discriminated schema",
+        "Flags path traversal in read_attachment: os.path.join with an unvalidated path can escape ATTACHMENT_ROOT (absolute path or ../)",
+        "Flags that list_tickets returns an unbounded result (per_page=100000, no pagination/cap/truncation) into the model's context",
+        "Flags that errors are not recoverable for the model (e.g. 'Error: 404' strings, raw raise_for_status/ValueError) and recommends isError results with what/why/next-step guidance",
+        "Flags delete_ticket as a destructive hard delete with no confirmation, dry-run, or destructiveHint annotation",
+        "Flags that the write actions (comment / escalate / merge) are not idempotent, so a model or client retry after a timeout posts duplicates",
+        "Flags that HELPDESK_URL silently falls back to a hard-coded production URL when the env var is missing (should fail fast at startup)",
+        "Flags that ticket_id / params values are interpolated unescaped into the Helpdesk API path, so '../' can reach other API routes",
+        "Uses the review template: output contains 'Backend / API / MCP Reviewer' and a Model field identifying the reviewing model"
+      ]
+    },
+    {
+      "id": 1,
+      "eval_name": "rest-orders-api-v1",
+      "prompt": "Review this orders API change before we merge \u2014 it's in orders_api.diff. Heads up, this is our public v1 API that the mobile apps and a bunch of partners use.",
+      "expected_output": "A Backend / API / MCP review that catches the breaking v1 response changes (total \u2192 totalCents, created_at \u2192 createdAt, public_id \u2192 internal bigint id), 200 + success:false, missing Idempotency-Key on refund, money as float, leaking err.stack, unbounded page_size + bare array + arbitrary sort, the side-effecting GET, and OpenAPI drift (spec says 201 / dollars).",
+      "files": [
+        "evals/diffs/orders_api.diff"
+      ],
+      "expectations": [
+        "Flags the breaking change to the published v1 order response (total removed/renamed to totalCents and/or created_at renamed to createdAt) and recommends keeping the old field / versioning / deprecation instead of changing v1 in place",
+        "Flags that the order id switched from public_id to the internal id as a breaking change (and/or notes IDs should be strings / not internal auto-increment)",
+        "Flags returning HTTP 200 with {success:false} for failures instead of proper 4xx status codes",
+        "Flags that the refund POST has no Idempotency-Key (or equivalent), so a client retry can issue a duplicate refund",
+        "Flags money handled as a float (parseFloat dollars / amount * 100 / float amount stored)",
+        "Flags the 500 error response leaking err.stack / internal error messages",
+        "Flags that page_size is not clamped to a server-side maximum (unbounded page size)",
+        "Flags that the sort parameter is not allowlisted (clients can sort by arbitrary columns)",
+        "Flags that the list endpoint returns a bare JSON array with no envelope / pagination metadata",
+        "Flags the GET /v1/orders/:id handler writing to the database (touchLastViewed) as a side-effecting GET",
+        "Flags OpenAPI drift on the refund endpoint: the spec documents 201 but the handler returns 200",
+        "Flags that the OpenAPI spec was not updated for the changed order response (totalCents/createdAt/id) and/or documents amount as dollars-as-number",
+        "Rates the refund authorization gap (any authenticated user of the account can issue refunds; no role/permission check) at Major or higher, rather than only deferring it to another reviewer",
+        "Rates customer_email newly exposed in every order response (PII) at Major or higher, rather than only deferring it to another reviewer",
+        "Flags that the refund cap is not cumulative (previous refunds are not counted) and/or not protected against concurrent refunds, so total refunds can exceed the order total",
+        "Flags that the provider refund is executed before any local record is written, so a failed insert or crash leaves money moved with no record and a retry refunds again",
+        "[breadth] Flags that total_cents may be missing/NULL for existing orders (no backfill in the diff) and that this breaks the over-refund guard (it either rejects legitimate refunds or lets any amount through)",
+        "Uses the review template: output contains 'Backend / API / MCP Reviewer' and a Model field identifying the reviewing model"
+      ]
+    },
+    {
+      "id": 2,
+      "eval_name": "remote-billing-mcp-streamable-http",
+      "prompt": "we're about to ship a hosted MCP server for billing so our support agent and claude.ai can look up invoices and issue refunds. diff is remote_billing_mcp.diff. give it a proper review before it goes live",
+      "expected_output": "A Backend / API / MCP review that catches token passthrough to the provider, no audience validation on the JWT, session id used as authentication (and predictable session ids), no Origin validation / cors *, provider call inside the DB transaction with no idempotency key while annotated idempotentHint, the arbitrary SQL tool, unbounded export_invoices, and the webhook with no signature check and no event-id dedupe.",
+      "files": [
+        "evals/diffs/remote_billing_mcp.diff"
+      ],
+      "expectations": [
+        "Flags token passthrough: the user's SSO/Okta token is forwarded to the payment provider API, which the MCP spec forbids (server should use its own credentials for downstream calls)",
+        "Flags that jwt.verify does not validate the token audience/resource, so any Okta-signed token for any app is accepted",
+        "Flags that an existing Mcp-Session-Id is treated as proof of authentication (requests with a known session skip auth) and/or that session ids are predictable (sub + Date.now())",
+        "Flags missing Origin header validation (cors origin '*', no Origin check) on the Streamable HTTP endpoint",
+        "Flags that issue_refund calls the provider over the network inside the DB transaction (locks held across a remote call; provider success + rollback leaves money moved with no record)",
+        "Flags that issue_refund is not idempotent (no idempotency key to the provider / retries double-refund) and that idempotentHint: true is therefore false",
+        "Flags run_billing_query as an arbitrary-SQL tool exposed to an agent (prompt-injection reachable, not read-only enforced)",
+        "Flags export_invoices returning an unbounded result (40k+ rows) into the model context without pagination/cap",
+        "Flags the provider webhook: no signature verification and/or no dedupe on event id, so redelivery double-credits the customer",
+        "Rates the missing per-account/tenant authorization on the billing tools (get_invoice / issue_refund / export_invoices act on any id) at Major or higher, rather than only deferring it",
+        "Flags the refund state inconsistency: refundedCents is updated at request time while ledger/balance change only on the webhook, and provider failure / refund.failed is never reconciled",
+        "[breadth] Flags that the provider webhook can arrive before issue_refund's DB transaction commits (refund row not yet visible), so settlement fails or matches the wrong refund",
+        "Uses the review template: output contains 'Backend / API / MCP Reviewer' and a Model field identifying the reviewing model"
+      ]
+    },
+    {
+      "id": 3,
+      "eval_name": "mcp-v2-expense-approvals",
+      "prompt": "Please review PR #903 (expense_mcp_v2.diff). It moves our expenses MCP server to the new SDK v2 and adds PIN confirmation for approvals. Finance wants it live next week.",
+      "expected_output": "Catches spec/SDK-dependent defects: PIN collected via form-mode elicitation (spec requires URL mode for credentials), bind_principal=None + approving as the approver_id from request state instead of the verified caller, hard-coded fallback request-state key, public cacheScope on a role-filtered tools/list, v2 SDK hiding non-ToolError exception text from the model, breaking tool rename, removed pagination with inline receipt images, 0.0.0.0 bind disabling Host/Origin checks, and reimburse without idempotency.",
+      "files": [
+        "evals/diffs/expense_mcp_v2.diff"
+      ],
+      "expectations": [
+        "Flags that the approval PIN is collected via form-mode elicitation, which the MCP spec forbids for passwords/credentials (must use URL-mode elicitation)",
+        "Flags that approval identity comes from request state rather than the verified caller: bind_principal=None leaves sealed state unbound to the user and/or approve() never checks current_user() is the expense's approver",
+        "Flags the hard-coded fallback REQUEST_STATE_KEY ('expenses-dev-request-state-key') used when the env var is missing (forgeable state; should fail at startup)",
+        "Flags cache_hints scope='public' on tools/list even though the tool list is filtered by role (must be 'private'), so one user's tool list can be served to another",
+        "Flags that raising ValueError/RuntimeError/PermissionError in SDK v2 gives the model only a generic 'Error executing tool' message, so expected failures should raise ToolError (or return isError) with recovery guidance",
+        "Flags the tool rename (list_pending_expenses/approve_expense -> dotted names) with the old names removed as a breaking change for existing clients/agent workflows, recommending aliases/deprecation",
+        "Flags that expenses.list_pending lost the v1 cursor pagination and 50-item cap (default 200, no max) and inlines receipt images, blowing up the model's context",
+        "Flags that host='0.0.0.0' with transport_security=None leaves the SDK's Host/Origin (DNS-rebinding) validation disabled",
+        "Flags that expenses.reimburse moves money with no idempotency key/guard, so a retry can schedule a duplicate payout",
+        "[breadth] Flags that expenses.reimburse is protected only by hiding it from the role-filtered tool list, with no authorization check inside the handler",
+        "Uses the review template: output contains 'Backend / API / MCP Reviewer' and a Model field identifying the reviewing model"
+      ]
+    },
+    {
+      "id": 4,
+      "eval_name": "rest-payments-idempotency-cursor-etag",
+      "prompt": "review payments_api_v2.diff please. adds idempotency keys, cursor pagination and If-Match to our public v2 payments API. tests are green, want to merge today",
+      "expected_output": "Catches subtle contract/semantics defects inside features that look implemented: racy check-then-act idempotency stored after the side effect, key not scoped per merchant, no request fingerprint; cursor on non-unique created_at skipping rows; page->cursor switch breaking v2 clients; second-resolution ETag and non-atomic If-Match; merge-patch null not clearing fields; new enum value breaking closed-enum clients.",
+      "files": [
+        "evals/diffs/payments_api_v2.diff"
+      ],
+      "expectations": [
+        "Flags the idempotency check-then-act race: two concurrent requests with the same key both miss the cache and both charge (needs an atomic reservation such as SET NX / unique insert before calling the PSP)",
+        "Flags that the idempotency record is written only after the PSP charge, so a crash/timeout between the charge and the redis.set lets a retry charge again",
+        "Flags that the idempotency key is not scoped to the merchant (idem:{key} is global), so one merchant's key can return another merchant's charge",
+        "Flags that a reused key with a different request body silently returns the original response instead of rejecting it (no request fingerprint)",
+        "Flags that the cursor uses only created_at with a strict '<', so invoices sharing a timestamp at a page boundary are skipped (needs a unique tiebreaker such as (created_at, id))",
+        "Flags that replacing page/page_size with cursor is a breaking change for existing v2 clients (old params are silently ignored)",
+        "Flags that the ETag is derived from updated_at truncated to whole seconds, so two updates in the same second share an ETag and If-Match cannot detect the conflict",
+        "Flags that the If-Match comparison and the save are not atomic (read-check-write race), so concurrent PATCHes can still lose updates (needs a conditional UPDATE)",
+        "Flags that PATCH ignores null values, so clients cannot clear a field, contradicting the JSON Merge Patch (RFC 7396) semantics the PR promises",
+        "Flags that adding the partially_paid enum value is a breaking change for existing clients/SDKs that decode status as a closed enum",
+        "[breadth] Flags that db.invoices.save() writes the whole invoice object, so a concurrent change to other fields (e.g. status/amount from a payment webhook) is overwritten",
+        "Uses the review template: output contains 'Backend / API / MCP Reviewer' and a Model field identifying the reviewing model"
+      ]
+    },
+    {
+      "id": 5,
+      "eval_name": "backend-outbox-credits-cache",
+      "prompt": "Can you review usage_credits_outbox.diff (PR #340)? It's the outbox + credits consumer work for billing.",
+      "expected_output": "Catches at-least-once semantics defects: relay marks published before sending (loss) and has no row claiming across 3 replicas (duplicates); consumer commits the dedupe marker outside any transaction with the debit (lost debit on failure); read-modify-write credit debit (lost updates); email retry of a non-idempotent POST and swallowed failures; low-balance email on every event; cache invalidated before commit; visibility timeout shorter than worst-case processing.",
+      "files": [
+        "evals/diffs/usage_credits_outbox.diff"
+      ],
+      "expectations": [
+        "Flags that the relay sets published_at before sending to SQS, so a failed send loses the event permanently",
+        "Flags that the relay does not claim/lock rows (e.g. FOR UPDATE SKIP LOCKED), so its 3 replicas publish the same events concurrently",
+        "Flags that the processed_events marker is committed separately from (before) the credit debit with no enclosing transaction, so a failure after the insert makes the redelivered message be skipped and the debit is lost",
+        "Flags that the credit debit is a read-modify-write of an absolute value, so concurrent events for the same account lose debits (needs an atomic credits = credits - units)",
+        "Flags that send_email_with_retry retries a non-idempotent POST on timeout without an idempotency key (duplicate emails) and/or treats HTTP error responses as success / swallows final failure",
+        "Flags that the low-balance email is sent on every event while below the threshold rather than once when the threshold is crossed",
+        "Flags that change_plan deletes the cache key inside the transaction before commit, so a concurrent get_plan can re-cache the old plan for the TTL",
+        "Flags that the 30s SQS visibility timeout is shorter than the worst-case time to process a batch (sequential handling + email retries/backoff), causing redelivery while still processing",
+        "[breadth] Flags that negative or otherwise invalid event units would add credits (no validation of units before the debit)",
+        "[breadth] Flags that one failing outbox row (unknown topic KeyError, send error) blocks the relay from progressing past it (no skip / dead-letter)",
+        "Uses the review template: output contains 'Backend / API / MCP Reviewer' and a Model field identifying the reviewing model"
+      ]
+    },
+    {
+      "id": 6,
+      "eval_name": "heldout-inventory-fulfillment",
+      "prompt": "can you review PR #77 (inventory_fulfillment.diff) before we ship it? it's the reservations + carrier tracking work for checkout",
+      "expected_output": "HELD-OUT (written after round-3 skill edits; not used to design them). Catches: unvalidated/negative quantity increasing stock; whole-row product save clobbering concurrent stock changes; toISOString on NULL carrier_eta 500ing every existing order; out-of-order carrier events regressing status; non-idempotent returned restock / duplicate order.delivered; unhandled unknown event type or tracking number; reservations never released; missing estimatedDelivery wiping stored ETA.",
+      "files": [
+        "evals/diffs/inventory_fulfillment.diff"
+      ],
+      "expectations": [
+        "Flags that quantity is not validated: a negative (or zero/non-integer/non-numeric) quantity passes the stock check and a negative value increases stock",
+        "Flags that PUT /v1/products/:id saves the entire product row (including stock), so stock changes made concurrently by reservations are overwritten",
+        "Flags that estimatedDelivery calls toISOString() on carrier_eta, which is NULL for all existing orders (new nullable column, no backfill), so GET /v1/orders/:id returns 500 for existing orders",
+        "Flags that carrier events can arrive out of order (e.g. in_transit after delivered) and the consumer regresses order status with no state-transition guard",
+        "Flags that the carrier consumer is not idempotent: a redelivered shipment.returned restocks twice and/or order.delivered is published more than once",
+        "Flags that an unknown event type (status undefined) or an unknown tracking number (order not found) is not handled, leading to a bad write or a thrown error and repeated redelivery",
+        "Flags that expired reservations are never released (nothing returns stock after the 15-minute hold)",
+        "Flags that an event without estimatedDelivery overwrites an existing carrier_eta with null",
+        "Uses the review template: output contains 'Backend / API / MCP Reviewer' and a Model field identifying the reviewing model"
+      ]
+    }
+  ]
+}

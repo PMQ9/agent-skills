@@ -1,0 +1,127 @@
+PR #212 — feat(mcp): add helpdesk MCP server so Claude Desktop can work our ticket queue
+
+Description (from PR body):
+  Adds a local MCP server (stdio) that lets Claude Desktop read and act on helpdesk
+  tickets. Users add it to claude_desktop_config.json and it talks to our internal
+  Helpdesk REST API. Keeping the tool surface small: list, get, one action tool,
+  attachments, delete.
+
+diff --git a/helpdesk_mcp/server.py b/helpdesk_mcp/server.py
+new file mode 100644
+--- /dev/null
++++ b/helpdesk_mcp/server.py
+@@ -0,0 +1,95 @@
++import os
++import json
++import httpx
++from mcp.server.fastmcp import FastMCP
++from mcp.types import ToolAnnotations
++
++HELPDESK_URL = os.environ.get("HELPDESK_URL", "https://helpdesk.internal.acme.com/api")
++ATTACHMENT_ROOT = os.environ.get("ATTACHMENT_ROOT", "/srv/helpdesk/attachments")
++
++mcp = FastMCP("helpdesk")
++
++
++def _client(api_key: str) -> httpx.Client:
++    return httpx.Client(base_url=HELPDESK_URL, headers={"Authorization": f"Bearer {api_key}"})
++
++
++@mcp.tool()
++def list_tickets(api_key: str, status: str = "open") -> str:
++    """List tickets."""
++    print(f"[helpdesk] list_tickets status={status}")
++    with _client(api_key) as c:
++        # Helpdesk API returns every matching ticket in one response
++        resp = c.get("/tickets", params={"status": status, "per_page": 100000})
++        resp.raise_for_status()
++        return json.dumps(resp.json())
++
++
++@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
++def get_ticket(api_key: str, ticket_id: str) -> str:
++    """Get a ticket by id."""
++    print(f"[helpdesk] get_ticket {ticket_id}")
++    with _client(api_key) as c:
++        resp = c.get(f"/tickets/{ticket_id}")
++        if resp.status_code != 200:
++            return f"Error: {resp.status_code}"
++        ticket = resp.json()
++        # Opening a ticket in the helpdesk UI assigns it to whoever opened it;
++        # mirror that so the agent "owns" what it looks at.
++        c.post(f"/tickets/{ticket_id}/assign", json={"assignee": "me"})
++        c.post(f"/tickets/{ticket_id}/mark-read")
++        return json.dumps(ticket)
++
++
++@mcp.tool()
++def ticket_action(api_key: str, action: str, params: dict) -> str:
++    """Performs the action on a ticket.
++
++    action: one of the helpdesk actions
++    params: parameters for the action
++    """
++    print(f"[helpdesk] ticket_action {action} {params}")
++    with _client(api_key) as c:
++        if action == "comment":
++            resp = c.post(f"/tickets/{params['id']}/comments", json={"body": params["text"]})
++        elif action == "close":
++            resp = c.post(f"/tickets/{params['ticket']}/close", json={"reason": params.get("reason")})
++        elif action == "reassign":
++            resp = c.post(f"/tickets/{params['id']}/assign", json={"assignee": params["to"]})
++        elif action == "priority":
++            resp = c.patch(f"/tickets/{params['id']}", json={"priority": params["level"]})
++        elif action == "merge":
++            resp = c.post(f"/tickets/{params['id']}/merge", json={"into": params["target"]})
++        elif action == "escalate":
++            resp = c.post(f"/tickets/{params['id']}/escalate", json=params)
++        else:
++            raise ValueError("bad action")
++        resp.raise_for_status()
++        return "ok"
++
++
++@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
++def read_attachment(api_key: str, path: str) -> str:
++    """Read an attachment file from the shared attachment store.
++
++    path: path of the attachment, e.g. "4812/screenshot.txt"
++    """
++    print(f"[helpdesk] read_attachment {path}")
++    full_path = os.path.join(ATTACHMENT_ROOT, path)
++    with open(full_path, "r", errors="replace") as f:
++        return f.read()
++
++
++@mcp.tool()
++def delete_ticket(api_key: str, ticket_id: str) -> str:
++    """Delete a ticket."""
++    print(f"[helpdesk] delete_ticket {ticket_id}")
++    with _client(api_key) as c:
++        resp = c.delete(f"/tickets/{ticket_id}", params={"hard": "true"})
++        resp.raise_for_status()
++        return "deleted"
++
++
++if __name__ == "__main__":
++    print("[helpdesk] starting helpdesk MCP server")
++    mcp.run()  # stdio transport
+diff --git a/helpdesk_mcp/README.md b/helpdesk_mcp/README.md
+new file mode 100644
+--- /dev/null
++++ b/helpdesk_mcp/README.md
+@@ -0,0 +1,14 @@
++# Helpdesk MCP server
++
++Add to `claude_desktop_config.json`:
++
++```json
++{
++  "mcpServers": {
++    "helpdesk": { "command": "python", "args": ["-m", "helpdesk_mcp.server"] }
++  }
++}
++```
++
++The model will ask you for your Helpdesk API key the first time it calls a tool —
++paste it into the chat and it will pass it along on each call.

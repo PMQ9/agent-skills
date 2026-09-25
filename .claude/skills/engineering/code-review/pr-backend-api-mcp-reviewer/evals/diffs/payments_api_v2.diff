@@ -1,0 +1,148 @@
+PR #1291 — feat(payments-api): idempotent charges, cursor pagination, conditional invoice updates
+
+Description (from PR body):
+  - POST /v2/charges now honors `Idempotency-Key` (Stripe-style) so the mobile SDK can retry safely.
+  - GET /v2/invoices switches from page-number to cursor pagination (newest first) — page
+    numbers got slow past page 400 for our biggest merchants.
+  - PATCH /v2/invoices/{id} supports `If-Match` for optimistic concurrency. The body is JSON
+    Merge Patch (RFC 7396), per our public API guidelines.
+  - Invoice `status` gains `partially_paid` for split payments.
+  v2 is our public API; ~200 merchants integrate against it (plus our iOS/Android SDKs).
+  Tests: added happy-path tests for each endpoint; all green.
+
+diff --git a/app/routes/charges.py b/app/routes/charges.py
+--- a/app/routes/charges.py
++++ b/app/routes/charges.py
+@@ -1,17 +1,31 @@
+ import json
+-from fastapi import APIRouter, Depends
++from fastapi import APIRouter, Depends, Header
++from fastapi.responses import JSONResponse
+
+ from app.auth import current_merchant
++from app.cache import redis
+ from app.db import db
+ from app.psp import psp
+ from app.schemas import ChargeIn, ChargeOut
+
+ router = APIRouter()
+
+
+ @router.post("/v2/charges", status_code=201, response_model=ChargeOut)
+-async def create_charge(body: ChargeIn, merchant=Depends(current_merchant)):
++async def create_charge(
++    body: ChargeIn,
++    merchant=Depends(current_merchant),
++    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
++):
++    if idempotency_key:
++        cached = await redis.get(f"idem:{idempotency_key}")
++        if cached:
++            return JSONResponse(json.loads(cached), status_code=201)
++
+     charge = await psp.create_charge(
+         amount_minor=body.amount_minor,
+         currency=body.currency,
+         source=body.source,
+         merchant_id=merchant.id,
+     )
+     await db.charges.insert(charge, merchant_id=merchant.id)
+-    return ChargeOut.from_model(charge)
++    payload = ChargeOut.from_model(charge).model_dump(mode="json")
++    if idempotency_key:
++        await redis.set(f"idem:{idempotency_key}", json.dumps(payload), ex=3600)
++    return payload
+diff --git a/app/routes/invoices.py b/app/routes/invoices.py
+--- a/app/routes/invoices.py
++++ b/app/routes/invoices.py
+@@ -1,19 +1,63 @@
+-from fastapi import APIRouter, Depends, HTTPException, Query
++import base64
++from datetime import datetime
++
++from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
++from fastapi.responses import JSONResponse
+
+ from app.auth import current_merchant
+ from app.db import db
+ from app.schemas import InvoiceOut
+
+ router = APIRouter()
++EDITABLE_FIELDS = {"memo", "due_date", "customer_reference", "footer"}
++
++
++def etag_for(inv) -> str:
++    return f'"{int(inv.updated_at.timestamp())}"'
+
+
+ @router.get("/v2/invoices")
+-async def list_invoices(page: int = Query(1, ge=1), page_size: int = Query(50, le=200), merchant=Depends(current_merchant)):
+-    rows = await db.fetch(
+-        "SELECT * FROM invoices WHERE merchant_id = $1 ORDER BY created_at DESC OFFSET $2 LIMIT $3",
+-        merchant.id, (page - 1) * page_size, page_size,
+-    )
+-    total = await db.fetchval("SELECT count(*) FROM invoices WHERE merchant_id = $1", merchant.id)
+-    return {"data": [InvoiceOut.from_row(r) for r in rows], "pagination": {"page": page, "total": total}}
++async def list_invoices(
++    cursor: str | None = None,
++    limit: int = Query(50, ge=1, le=200),
++    merchant=Depends(current_merchant),
++):
++    after = datetime.fromisoformat(base64.urlsafe_b64decode(cursor).decode()) if cursor else None
++    rows = await db.fetch(
++        """
++        SELECT * FROM invoices
++        WHERE merchant_id = $1 AND ($2::timestamptz IS NULL OR created_at < $2)
++        ORDER BY created_at DESC
++        LIMIT $3
++        """,
++        merchant.id, after, limit,
++    )
++    next_cursor = (
++        base64.urlsafe_b64encode(rows[-1]["created_at"].isoformat().encode()).decode()
++        if len(rows) == limit else None
++    )
++    return {
++        "data": [InvoiceOut.from_row(r) for r in rows],
++        "pagination": {"next_cursor": next_cursor, "has_more": next_cursor is not None},
++    }
+
+
+ @router.get("/v2/invoices/{invoice_id}")
+ async def get_invoice(invoice_id: str, merchant=Depends(current_merchant)):
+     inv = await db.invoices.get(invoice_id, merchant.id)
+     if inv is None:
+         raise HTTPException(404)
+-    return InvoiceOut.from_model(inv)
++    return JSONResponse(InvoiceOut.from_model(inv).model_dump(mode="json"), headers={"ETag": etag_for(inv)})
++
++
++@router.patch("/v2/invoices/{invoice_id}")
++async def patch_invoice(
++    invoice_id: str,
++    patch: dict = Body(..., media_type="application/merge-patch+json"),
++    if_match: str | None = Header(None, alias="If-Match"),
++    merchant=Depends(current_merchant),
++):
++    inv = await db.invoices.get(invoice_id, merchant.id)
++    if inv is None:
++        raise HTTPException(404)
++    if if_match and if_match != etag_for(inv):
++        raise HTTPException(412, "Precondition Failed")
++    for field, value in patch.items():
++        if field in EDITABLE_FIELDS and value is not None:
++            setattr(inv, field, value)
++    await db.invoices.save(inv)  # sets updated_at = now()
++    return JSONResponse(InvoiceOut.from_model(inv).model_dump(mode="json"), headers={"ETag": etag_for(inv)})
+diff --git a/app/schemas.py b/app/schemas.py
+--- a/app/schemas.py
++++ b/app/schemas.py
+@@ -12,5 +12,6 @@ class InvoiceStatus(str, Enum):
+     draft = "draft"
+     open = "open"
+     paid = "paid"
+     void = "void"
++    partially_paid = "partially_paid"
+
+
+ class InvoiceOut(BaseModel):

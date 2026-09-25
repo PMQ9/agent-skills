@@ -1,0 +1,152 @@
+PR #903 — feat(expenses-mcp): migrate to MCP SDK v2 / spec 2026-07-28, PIN-confirmed approvals, 3 replicas
+
+Description (from PR body):
+  - Migrates the Expenses MCP server from FastMCP (SDK v1) to MCPServer (SDK v2, spec 2026-07-28).
+  - Tool names now use our dotted house style (`expenses.list_pending`, `expenses.approve`,
+    `expenses.reimburse`) to match the other internal servers. The old names are gone.
+  - Approvals now require the approver to confirm with their 6-digit approval PIN (finance
+    audit requirement), collected mid-call via elicitation.
+  - tools/list is cacheable for an hour to cut load on the auth service; finance admins
+    additionally see `expenses.reimburse`.
+  - Runs as 3 replicas behind the internal ALB (k8s). Consumed by our Claude-based finance
+    assistant and by Claude Desktop through the remote connector.
+
+diff --git a/expenses_mcp/server.py b/expenses_mcp/server.py
+--- a/expenses_mcp/server.py
++++ b/expenses_mcp/server.py
+@@ -1,18 +1,105 @@
+-from mcp.server.fastmcp import FastMCP
+-from .store import expenses_db
+-
+-mcp = FastMCP("expenses")
+-
+-
+-@mcp.tool()
+-def list_pending_expenses(limit: int = 25, cursor: str | None = None) -> dict:
+-    """List expenses awaiting your approval, newest first. Returns {items, next_cursor}."""
+-    page = expenses_db.pending_for_approver(current_user(), limit=min(limit, 50), cursor=cursor)
+-    return {"items": [e.summary() for e in page.items], "next_cursor": page.next_cursor}
+-
+-
+-@mcp.tool()
+-def approve_expense(expense_id: str) -> str:
+-    """Approve a pending expense you are the approver for."""
+-    expenses_db.approve(expense_id, approver=current_user())
+-    return f"Approved {expense_id}"
++import os
++
++from mcp.server.caching import CacheHint
++from mcp.server.auth.settings import AuthSettings
++from mcp.server.mcpserver import Context, Image, MCPServer, RequestStateSecurity
++from mcp.server.transport_security import TransportSecuritySettings
++from mcp.types import (
++    ElicitRequest,
++    ElicitRequestFormParams,
++    ElicitResult,
++    InputRequiredResult,
++    ToolAnnotations,
++)
++
++from .auth import OktaTokenVerifier, RoleFilteredTools, current_user
++from .store import expenses_db, receipts
++
++PIN_SCHEMA = {
++    "type": "object",
++    "properties": {
++        "pin": {"type": "string", "description": "Your 6-digit approval PIN", "minLength": 6, "maxLength": 6},
++    },
++    "required": ["pin"],
++}
++
++mcp = MCPServer(
++    "expenses",
++    token_verifier=OktaTokenVerifier(audience="api://expenses-mcp"),
++    auth=AuthSettings(
++        issuer_url="https://acme.okta.com/oauth2/default",
++        resource_server_url="https://expenses-mcp.acme.internal/mcp",
++        required_scopes=["expenses"],
++    ),
++    request_state_security=RequestStateSecurity(
++        keys=[os.environ.get("REQUEST_STATE_KEY", "expenses-dev-request-state-key")],
++        bind_principal=None,  # identity is already enforced by the gateway + token verifier
++    ),
++    cache_hints={"tools/list": CacheHint(ttl_ms=60 * 60 * 1000, scope="public")},
++    middleware=[RoleFilteredTools(admin_only={"expenses.reimburse"})],
++)
++
++
++@mcp.tool(
++    name="expenses.list_pending",
++    description="List expenses awaiting your approval, with their receipts, newest first.",
++    annotations=ToolAnnotations(readOnlyHint=True),
++)
++def list_pending(limit: int = 200) -> list:
++    out = []
++    for e in expenses_db.pending_for_approver(current_user(), limit=limit):
++        out.append(e.summary())
++        for r in receipts.for_expense(e.id):
++            out.append(Image(data=r.bytes, format=r.format))
++    return out
++
++
++@mcp.tool(
++    name="expenses.approve",
++    description="Approve a pending expense you are the approver for. Asks you to confirm with your approval PIN.",
++    annotations=ToolAnnotations(destructiveHint=False, idempotentHint=True),
++)
++async def approve(expense_id: str, ctx: Context) -> str | InputRequiredResult:
++    expense = expenses_db.get(expense_id)
++    if expense is None:
++        raise ValueError(f"expense {expense_id} not found")
++    if expense.status != "pending":
++        raise RuntimeError(f"expense {expense_id} is {expense.status}")
++
++    responses = ctx.input_responses
++    if responses is None or "pin" not in responses:
++        ask = ElicitRequest(
++            params=ElicitRequestFormParams(
++                message=f"Approve {expense.summary_line()}? Enter your approval PIN to confirm.",
++                requested_schema=PIN_SCHEMA,
++            )
++        )
++        return InputRequiredResult(
++            input_requests={"pin": ask},
++            request_state=f"approve:{expense_id}:{expense.approver_id}",
++        )
++
++    _, state_expense_id, approver_id = ctx.request_state.split(":")
++    answer = responses["pin"]
++    if not (isinstance(answer, ElicitResult) and answer.action == "accept"):
++        return "Approval cancelled."
++    if not expenses_db.check_pin(approver_id, answer.content["pin"]):
++        raise PermissionError("invalid PIN")
++    expenses_db.approve(state_expense_id, approver=approver_id)
++    return f"Approved {state_expense_id}"
++
++
++@mcp.tool(
++    name="expenses.reimburse",
++    description="Trigger reimbursement payout for an approved expense. Finance admins only.",
++    annotations=ToolAnnotations(destructiveHint=True),
++)
++def reimburse(expense_id: str) -> str:
++    payout = expenses_db.reimburse(expense_id, by=current_user())
++    return f"Payout {payout.id} scheduled for {payout.amount_display}"
++
++
++app = mcp.streamable_http_app(
++    host="0.0.0.0",
++    transport_security=None,
++)
+diff --git a/deploy/k8s/expenses-mcp.yaml b/deploy/k8s/expenses-mcp.yaml
+--- a/deploy/k8s/expenses-mcp.yaml
++++ b/deploy/k8s/expenses-mcp.yaml
+@@ -6,7 +6,7 @@ metadata:
+ spec:
+-  replicas: 1
++  replicas: 3
+   template:
+     spec:
+       containers:
+         - name: expenses-mcp
+           image: registry.acme.internal/expenses-mcp:2.0.0

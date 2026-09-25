@@ -1,0 +1,156 @@
+PR #57 — feat: hosted Billing MCP server for our support agents (Streamable HTTP + SSO)
+
+Description (from PR body):
+  Exposes billing operations to our Claude-based support agent and to Claude.ai as a
+  remote connector. Users sign in with our SSO (Okta) and the agent can look up
+  invoices, issue refunds, and pull exports. Deployed behind the public ALB at
+  https://billing-mcp.acme.com/mcp. Also adds the provider webhook so refunds
+  settle back into our ledger.
+
+diff --git a/src/server.ts b/src/server.ts
+new file mode 100644
+--- /dev/null
++++ b/src/server.ts
+@@ -0,0 +1,142 @@
++import express from "express";
++import cors from "cors";
++import jwt from "jsonwebtoken";
++import { randomUUID } from "node:crypto";
++import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
++import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
++import { z } from "zod";
++import { db } from "./db";
++
++const PROVIDER_API = "https://api.payprovider.com/v2";
++const OKTA_PUBLIC_KEY = process.env.OKTA_PUBLIC_KEY!;
++
++const app = express();
++app.use(cors({ origin: "*" }));
++app.use(express.json());
++
++// ---- auth -----------------------------------------------------------------
++// Any valid Okta-signed token is accepted; we trust Okta.
++function authenticate(req: express.Request, res: express.Response, next: express.NextFunction) {
++  const header = req.headers.authorization ?? "";
++  const token = header.replace("Bearer ", "");
++  try {
++    (req as any).user = jwt.verify(token, OKTA_PUBLIC_KEY, { algorithms: ["RS256"] });
++    (req as any).rawToken = token;
++    next();
++  } catch {
++    res.status(401).json({ error: "unauthorized" });
++  }
++}
++
++// ---- MCP server -------------------------------------------------------------
++const sessions: Record<string, { transport: StreamableHTTPServerTransport; user: any; token: string }> = {};
++
++function buildServer(sessionId: () => string) {
++  const server = new McpServer({ name: "billing", version: "1.0.0" });
++
++  server.registerTool(
++    "get_invoice",
++    {
++      description: "Look up an invoice by id. Returns the invoice with its line items.",
++      inputSchema: { invoiceId: z.string().describe("Invoice id, e.g. inv_01J8...") },
++      annotations: { readOnlyHint: true },
++    },
++    async ({ invoiceId }) => {
++      const session = sessions[sessionId()];
++      const inv = await db.invoices.find(invoiceId);          // no account scoping
++      if (!inv) throw new Error("not found");
++      return { content: [{ type: "text", text: JSON.stringify(inv) }] };
++    },
++  );
++
++  server.registerTool(
++    "issue_refund",
++    {
++      description: "Refund an invoice.",
++      inputSchema: {
++        invoiceId: z.string(),
++        amountCents: z.number().int().positive(),
++        reason: z.string().optional(),
++      },
++      annotations: { idempotentHint: true },
++    },
++    async ({ invoiceId, amountCents, reason }) => {
++      const session = sessions[sessionId()];
++      return db.transaction(async (tx) => {
++        const inv = await tx.invoices.findForUpdate(invoiceId);
++        await tx.refunds.insert({ invoiceId, amountCents, reason, requestedBy: session.user.sub });
++        // Call the provider with the caller's own SSO token so the provider sees who did it.
++        const r = await fetch(`${PROVIDER_API}/charges/${inv.chargeId}/refunds`, {
++          method: "POST",
++          headers: { Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" },
++          body: JSON.stringify({ amount: amountCents }),
++        });
++        if (!r.ok) throw new Error(`provider error ${r.status}`);
++        const refund = await r.json();
++        await tx.invoices.update(invoiceId, { refundedCents: inv.refundedCents + amountCents });
++        return { content: [{ type: "text", text: `Refund ${refund.id} created` }] };
++      });
++    },
++  );
++
++  server.registerTool(
++    "export_invoices",
++    {
++      description: "Export all invoices for the customer as JSON.",
++      inputSchema: { customerId: z.string() },
++      annotations: { readOnlyHint: true },
++    },
++    async ({ customerId }) => {
++      const rows = await db.invoices.allForCustomer(customerId); // enterprise customers have 40k+ invoices
++      return { content: [{ type: "text", text: JSON.stringify(rows) }] };
++    },
++  );
++
++  server.registerTool(
++    "run_billing_query",
++    {
++      description: "Run a read query against the billing database. For analysts.",
++      inputSchema: { sql: z.string() },
++    },
++    async ({ sql }) => {
++      const rows = await db.raw(sql);
++      return { content: [{ type: "text", text: JSON.stringify(rows) }] };
++    },
++  );
++
++  return server;
++}
++
++app.post("/mcp", async (req, res) => {
++  const sid = req.headers["mcp-session-id"] as string | undefined;
++
++  // Existing session: the session id proves the caller already authenticated.
++  if (sid && sessions[sid]) {
++    return sessions[sid].transport.handleRequest(req, res, req.body);
++  }
++
++  // New session: authenticate once, then remember the user + token on the session.
++  authenticate(req, res, async () => {
++    let newId = "";
++    const transport = new StreamableHTTPServerTransport({
++      sessionIdGenerator: () => (newId = `${(req as any).user.sub}-${Date.now()}`),
++    });
++    const server = buildServer(() => newId);
++    await server.connect(transport);
++    await transport.handleRequest(req, res, req.body);
++    sessions[newId] = { transport, user: (req as any).user, token: (req as any).rawToken };
++  });
++});
++
++// ---- provider webhook --------------------------------------------------------
++app.post("/webhooks/provider", async (req, res) => {
++  const event = req.body;
++  if (event.type === "refund.succeeded") {
++    const refund = await db.refunds.findByInvoice(event.data.invoice_id);
++    await db.ledger.insert({ invoiceId: refund.invoiceId, amountCents: event.data.amount, kind: "refund" });
++    await db.customers.creditBalance(refund.customerId, event.data.amount);
++  }
++  res.sendStatus(200);
++});
++
++app.listen(8080, "0.0.0.0", () => console.log("billing MCP listening on :8080"));

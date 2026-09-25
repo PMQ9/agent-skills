@@ -1,0 +1,126 @@
+PR #77 — feat(fulfillment): stock reservations, product edits, delivery ETA, carrier events
+
+Description (from PR body):
+  - POST /v1/reservations reserves stock for a cart during checkout (15 min hold).
+  - PUT /v1/products/:id lets merchandisers edit price and title from the admin app.
+  - Order responses now include `estimatedDelivery`, from the new `carrier_eta` column
+    (migration included). Storefront and the partner feed both read GET /v1/orders/:id.
+  - New consumer applies carrier webhooks (`shipment.in_transit`, `shipment.delivered`,
+    `shipment.returned`) relayed through our events bus to order status.
+  Tests added for the happy path of each.
+
+diff --git a/migrations/0042_carrier_eta.sql b/migrations/0042_carrier_eta.sql
+new file mode 100644
+--- /dev/null
++++ b/migrations/0042_carrier_eta.sql
+@@ -0,0 +1,1 @@
++ALTER TABLE orders ADD COLUMN carrier_eta timestamptz;
+diff --git a/src/routes/reservations.ts b/src/routes/reservations.ts
+new file mode 100644
+--- /dev/null
++++ b/src/routes/reservations.ts
+@@ -0,0 +1,30 @@
++import { Router } from "express";
++import { db } from "../db";
++import { requireAuth } from "../auth";
++
++export const reservations = Router();
++
++reservations.post("/v1/reservations", requireAuth, async (req, res) => {
++  const { productId, quantity } = req.body;
++  const result = await db.tx(async (t) => {
++    const product = await t.one("SELECT id, stock FROM products WHERE id = $1 FOR UPDATE", [productId]);
++    if (product.stock < quantity) {
++      return { ok: false as const };
++    }
++    await t.none("UPDATE products SET stock = stock - $1 WHERE id = $2", [quantity, productId]);
++    const r = await t.one(
++      "INSERT INTO reservations (product_id, quantity, cart_id, expires_at) VALUES ($1, $2, $3, now() + interval '15 minutes') RETURNING id, expires_at",
++      [productId, quantity, req.user.cartId],
++    );
++    return { ok: true as const, reservation: r };
++  });
++  if (!result.ok) {
++    return res.status(409).json({ type: "https://errors.acme.com/out-of-stock", title: "Out of stock", status: 409 });
++  }
++  res.status(201).json({
++    id: result.reservation.id,
++    productId,
++    quantity,
++    expiresAt: result.reservation.expires_at.toISOString(),
++  });
++});
+diff --git a/src/routes/products.ts b/src/routes/products.ts
+--- a/src/routes/products.ts
++++ b/src/routes/products.ts
+@@ -1,10 +1,19 @@
+ import { Router } from "express";
+ import { db } from "../db";
+-import { requireAuth } from "../auth";
++import { requireAuth, requireRole } from "../auth";
+ import { toProductResponse } from "../serializers";
+
+ export const products = Router();
+
+ products.get("/v1/products/:id", requireAuth, async (req, res) => {
+   const p = await db.products.get(req.params.id);
+   if (!p) return res.status(404).json({ type: "https://errors.acme.com/not-found", title: "Not found", status: 404 });
+   res.json(toProductResponse(p));
+ });
++
++products.put("/v1/products/:id", requireAuth, requireRole("merchandiser"), async (req, res) => {
++  const p = await db.products.get(req.params.id);
++  if (!p) return res.status(404).json({ type: "https://errors.acme.com/not-found", title: "Not found", status: 404 });
++  if (req.body.priceCents !== undefined) p.price_cents = req.body.priceCents;
++  if (req.body.title !== undefined) p.title = req.body.title;
++  await db.products.save(p); // UPDATE products SET title, price_cents, stock, status, ... WHERE id
++  res.json(toProductResponse(p));
++});
+diff --git a/src/serializers.ts b/src/serializers.ts
+--- a/src/serializers.ts
++++ b/src/serializers.ts
+@@ -10,5 +10,6 @@ export function toOrderResponse(o: OrderRow) {
+     status: o.status,
+     totalCents: o.total_cents,
+     createdAt: o.created_at.toISOString(),
++    estimatedDelivery: o.carrier_eta.toISOString(),
+   };
+ }
+diff --git a/src/consumers/carrierEvents.ts b/src/consumers/carrierEvents.ts
+new file mode 100644
+--- /dev/null
++++ b/src/consumers/carrierEvents.ts
+@@ -0,0 +1,33 @@
++import { db } from "../db";
++import { bus } from "../bus";
++
++const STATUS_FOR_EVENT: Record<string, string> = {
++  "shipment.in_transit": "in_transit",
++  "shipment.delivered": "delivered",
++  "shipment.returned": "returned",
++};
++
++bus.subscribe("carrier.events", async (msg) => {
++  const evt = JSON.parse(msg.body);
++  const status = STATUS_FOR_EVENT[evt.type];
++  const order = await db.orders.byTrackingNumber(evt.trackingNumber);
++
++  await db.orders.update(order.id, {
++    status,
++    carrier_eta: evt.estimatedDelivery ? new Date(evt.estimatedDelivery) : null,
++  });
++
++  if (status === "returned") {
++    await db.tx(async (t) => {
++      const items = await t.many("SELECT product_id, quantity FROM order_items WHERE order_id = $1", [order.id]);
++      for (const it of items) {
++        await t.none("UPDATE products SET stock = stock + $1 WHERE id = $2", [it.quantity, it.product_id]);
++      }
++    });
++  }
++
++  if (status === "delivered") {
++    await bus.publish("order.delivered", { orderId: order.id });
++  }
++  msg.ack();
++});

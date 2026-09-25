@@ -1,0 +1,120 @@
+PR #488 — feat(orders): refunds endpoint, order listing, and cents-based totals
+
+Description (from PR body):
+  - New POST /v1/orders/:id/refund so support tooling and the mobile app can issue refunds.
+  - New GET /v1/orders listing for the partner dashboard.
+  - Switch order totals to integer cents internally to stop rounding bugs; the order
+    response now exposes `totalCents`.
+  Public API (v1) is consumed by the iOS/Android apps and ~40 partner integrations.
+
+diff --git a/src/routes/orders.ts b/src/routes/orders.ts
+--- a/src/routes/orders.ts
++++ b/src/routes/orders.ts
+@@ -1,19 +1,52 @@
+ import { Router } from "express";
+ import { db } from "../db";
+ import { payments } from "../payments";
+ import { requireAuth } from "../auth";
+
+ export const orders = Router();
+
+-function toOrderResponse(row: OrderRow) {
+-  return {
+-    id: row.public_id,
+-    status: row.status,
+-    total: row.total,            // decimal string, e.g. "129.99"
+-    currency: row.currency,
+-    created_at: row.created_at.toISOString(),
+-  };
+-}
++function toOrderResponse(row: OrderRow) {
++  return {
++    id: row.id,                   // switched to internal bigint id, public_id is being retired
++    status: row.status,
++    totalCents: row.total_cents,
++    currency: row.currency,
++    createdAt: row.created_at.toISOString(),
++    customer_email: row.customer_email,
++  };
++}
+
+ orders.get("/v1/orders/:id", requireAuth, async (req, res) => {
+   const row = await db.orders.findForAccount(req.params.id, req.user.accountId);
+   if (!row) return res.status(404).json({ error: "not found" });
++  await db.orders.touchLastViewed(row.id, req.user.id);
+   res.json(toOrderResponse(row));
+ });
+
++orders.get("/v1/orders", requireAuth, async (req, res) => {
++  const page = Number(req.query.page ?? 1);
++  const pageSize = Number(req.query.page_size ?? 50);
++  const rows = await db.orders.listForAccount(req.user.accountId, {
++    offset: (page - 1) * pageSize,
++    limit: pageSize,
++    sort: String(req.query.sort ?? "created_at"),
++  });
++  res.json(rows.map(toOrderResponse));
++});
++
++orders.post("/v1/orders/:id/refund", requireAuth, async (req, res) => {
++  try {
++    const row = await db.orders.findForAccount(req.params.id, req.user.accountId);
++    if (!row) {
++      return res.status(200).json({ success: false, error: "Order not found" });
++    }
++    const amount = parseFloat(req.body.amount);          // dollars, e.g. 19.99
++    if (amount * 100 > row.total_cents) {
++      return res.status(200).json({ success: false, error: "Refund exceeds order total" });
++    }
++    const refund = await payments.refund({
++      chargeId: row.charge_id,
++      amountCents: Math.round(amount * 100),
++    });
++    await db.refunds.insert({ orderId: row.id, providerRefundId: refund.id, amount });
++    return res.json({ success: true, refund });
++  } catch (err: any) {
++    return res.status(500).json({ success: false, error: err.message, stack: err.stack });
++  }
++});
+diff --git a/src/db/orders.ts b/src/db/orders.ts
+--- a/src/db/orders.ts
++++ b/src/db/orders.ts
+@@ -20,4 +20,16 @@ export const ordersRepo = {
+   async findForAccount(id: string, accountId: string) {
+     return sql`SELECT * FROM orders WHERE id = ${id} AND account_id = ${accountId}`.one();
+   },
++
++  async listForAccount(accountId: string, opts: { offset: number; limit: number; sort: string }) {
++    return sql`
++      SELECT * FROM orders
++      WHERE account_id = ${accountId}
++      ORDER BY ${sql.identifier(opts.sort)} DESC
++      OFFSET ${opts.offset} LIMIT ${opts.limit}`.many();
++  },
++
++  async touchLastViewed(orderId: string, userId: string) {
++    return sql`UPDATE orders SET last_viewed_by = ${userId}, last_viewed_at = now() WHERE id = ${orderId}`;
++  },
+ };
+diff --git a/openapi/v1.yaml b/openapi/v1.yaml
+--- a/openapi/v1.yaml
++++ b/openapi/v1.yaml
+@@ -88,3 +88,18 @@ paths:
++  /v1/orders/{id}/refund:
++    post:
++      summary: Refund an order
++      requestBody:
++        content:
++          application/json:
++            schema:
++              type: object
++              properties:
++                amount: { type: number, description: "Refund amount in dollars" }
++      responses:
++        "201":
++          description: Refund created
++        "404":
++          $ref: "#/components/responses/NotFound"
+   /v1/orders/{id}:
+     get:
+       summary: Get an order
