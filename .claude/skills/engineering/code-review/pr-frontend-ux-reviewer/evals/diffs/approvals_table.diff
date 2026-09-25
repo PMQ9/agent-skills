@@ -1,0 +1,124 @@
+@@ new file src/features/approvals/ApprovalsTable.tsx @@
++import { useEffect, useState } from "react";
++import { CheckIcon, XIcon, TrashIcon } from "lucide-react";
++
++export function ApprovalsTable({ collegeId }: { collegeId: string }) {
++  const [rows, setRows] = useState<Approval[]>([]);
++  const [loading, setLoading] = useState(true);
++
++  useEffect(() => {
++    setLoading(true);
++    fetch(`/api/approvals?college=${collegeId}`)
++      .then((r) => r.json())
++      .then((d) => {
++        setRows(d.items);
++        setLoading(false);
++      });
++  }, [collegeId]);
++
++  if (loading) return <div className="p-8 text-center">Loading…</div>;
++
++  return (
++    <table className="w-full" style={{ minWidth: "980px" }}>
++      <thead>
++        <tr className="border-b" style={{ borderColor: "#E4E4E7" }}>
++          <th className="text-left" style={{ fontSize: "13px", color: "#71717A" }}>Requester</th>
++          <th className="text-left" style={{ fontSize: "13px", color: "#71717A" }}>Program</th>
++          <th className="text-left" style={{ fontSize: "13px", color: "#71717A" }}>Submitted</th>
++          <th className="text-left" style={{ fontSize: "13px", color: "#71717A" }}>Status</th>
++          <th></th>
++        </tr>
++      </thead>
++      <tbody>
++        {rows.map((row, i) => (
++          <tr key={i} className="group border-b hover:bg-gray-50">
++            <td className="py-3">
++              <div className="flex items-center gap-2">
++                <img src={row.avatarUrl} className="rounded-full" />
++                <span>{row.requesterName}</span>
++              </div>
++            </td>
++            <td>{row.program}</td>
++            <td>{new Date(row.submittedAt).toLocaleDateString()}</td>
++            <td>
++              <span
++                className="rounded-full px-2 py-1"
++                style={{
++                  fontSize: "11px",
++                  background: row.status === "pending" ? "#FEF9C3" : "#DCFCE7",
++                  color: row.status === "pending" ? "#CA8A04" : "#16A34A",
++                }}
++              >
++                {row.status}
++              </span>
++            </td>
++            <td>
++              <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
++                <div
++                  className="cursor-pointer rounded p-1 hover:bg-green-100"
++                  onClick={() => approve(row.id)}
++                >
++                  <CheckIcon size={16} />
++                </div>
++                <div
++                  className="cursor-pointer rounded p-1 hover:bg-red-100"
++                  onClick={() => reject(row.id)}
++                >
++                  <XIcon size={16} />
++                </div>
++                <button
++                  className="rounded p-1 hover:bg-red-100 focus:outline-none"
++                  onClick={() => deleteRequest(row.id)}
++                >
++                  <TrashIcon size={16} />
++                </button>
++              </div>
++            </td>
++          </tr>
++        ))}
++      </tbody>
++    </table>
++  );
++}
+
+@@ src/features/approvals/ApprovalsPage.tsx @@
+ export default function ApprovalsPage() {
+-  return <div className="p-6"><h1>Approvals</h1><ComingSoon /></div>;
++  const [statusFilter, setStatusFilter] = useState("all");
++  const [search, setSearch] = useState("");
++  return (
++    <div className="p-6">
++      <h1>Approvals</h1>
++      <div className="mb-4 flex gap-3">
++        <input
++          placeholder="Search requester"
++          value={search}
++          onChange={(e) => setSearch(e.target.value)}
++          className="rounded border px-3 py-2 focus:outline-none"
++          style={{ width: "320px" }}
++        />
++        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
++          <option value="all">All</option>
++          <option value="pending">Pending</option>
++        </select>
++      </div>
++      <ApprovalsTable collegeId={useCollege().id} />
++    </div>
++  );
+ }
+
+@@ src/styles/tokens.css @@
+ :root {
+   --color-background: #FFFFFF;
+   --color-card: #FFFFFF;
+   --color-foreground: #18181B;
+   --color-muted-foreground: #71717A;
+   --color-border: #E4E4E7;
+   --color-primary: #C9A227;
+   --color-warning: #CA8A04;
+   --color-warning-bg: #FEF9C3;
+   --color-success: #16A34A;
+   --color-success-bg: #DCFCE7;
++  --z-dropdown: 30;
++  --z-modal: 50;
+ }

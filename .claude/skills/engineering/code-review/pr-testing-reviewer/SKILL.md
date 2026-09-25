@@ -14,6 +14,7 @@ description: >-
   a generic code read when judging whether a change is adequately, meaningfully,
   and durably tested. Fetches the diff with the gh CLI, writes a review using a
   fixed Test Reviewer template that names the model, and can post it to the PR.
+effort: high
 ---
 
 # Test Reviewer — the QA Engineer's Eye

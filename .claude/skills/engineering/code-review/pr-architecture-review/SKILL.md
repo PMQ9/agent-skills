@@ -14,6 +14,7 @@ description: >-
   boundaries, or long-term design are at stake — even without the word
   "architecture." Stays at the design level and deliberately ignores
   micro-optimizations and line-level performance tuning.
+effort: high
 ---
 
 # Architecture PR Reviewer

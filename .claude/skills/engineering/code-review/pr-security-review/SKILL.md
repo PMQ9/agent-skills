@@ -13,6 +13,7 @@ description: >-
   security bugs in a changeset. Fetches the diff with the gh CLI, writes findings into a
   mandatory template that names the Security Reviewer and the model, and posts the review back to
   the PR as a comment.
+effort: xhigh
 ---
 
 # Security PR Review

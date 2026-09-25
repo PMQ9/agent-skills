@@ -1,0 +1,102 @@
+@@ package.json @@
+   "dependencies": {
+     "react": "19.0.0",
+     "react-dom": "19.0.0",
++    "moment": "^2.30.1",
++    "lodash": "^4.17.21",
++    "chart.js": "^4.4.7",
++    "react-chartjs-2": "^5.3.0",
+     "@tanstack/react-query": "^5.62.0"
+   }
+
+@@ new file src/features/dashboard/EnrollmentCard.tsx @@
++import * as Icons from "lucide-react";
++import { Bar } from "react-chartjs-2";
++import { Chart, registerables } from "chart.js";
++import moment from "moment";
++import _ from "lodash";
++
++Chart.register(...registerables);
++
++export function EnrollmentCard({ termId }: { termId: string }) {
++  const { data: term } = useQuery({
++    queryKey: ["term", termId],
++    queryFn: () => fetch(`/api/terms/${termId}`).then((r) => r.json()),
++  });
++
++  // depends on term.code, so it can't start until the request above resolves
++  const { data: enrollments, isLoading } = useQuery({
++    queryKey: ["enrollments", term?.code],
++    enabled: !!term?.code,
++    queryFn: () => fetch(`/api/enrollments?term=${term.code}`).then((r) => r.json()),
++  });
++
++  const byMajor = _.groupBy(enrollments ?? [], "major");
++  const labels = Object.keys(byMajor).sort();
++
++  if (isLoading) return <Spinner />;
++
++  return (
++    <div className="rounded-xl border bg-card p-6">
++      <div className="mb-4 flex items-center justify-between">
++        <h2 className="text-lg font-semibold">Enrollment by major</h2>
++        <span className="text-sm text-muted-foreground">
++          Updated {moment(enrollments[0]?.updatedAt).fromNow()}
++        </span>
++      </div>
++      <Bar
++        data={{
++          labels,
++          datasets: [{ data: labels.map((l) => byMajor[l].length), backgroundColor: "#C9A227" }],
++        }}
++        options={{ animation: { duration: 600 } }}
++      />
++      <div className="mt-4 flex gap-4">
++        {labels.map((l) => (
++          <div key={l} className="flex items-center gap-1 text-xs">
++            <Icons.CircleIcon size={10} />
++            {l}
++          </div>
++        ))}
++      </div>
++    </div>
++  );
++}
+
+@@ src/features/dashboard/DashboardPage.tsx @@
+ export default function DashboardPage() {
+   return (
+     <main className="mx-auto max-w-[1200px] p-6">
+-      <img src="/hero-campus.jpg" alt="Campus" className="mb-6 w-full rounded-xl" />
++      <img
++        src="/hero-campus.jpg"
++        alt="Campus"
++        loading="lazy"
++        className="mb-6 w-full rounded-xl"
++      />
+       <div className="grid gap-6 md:grid-cols-2">
+         <StatsCard />
+-        <ComingSoonCard />
++        <EnrollmentCard termId={termId} />
+       </div>
++      <section className="mt-6">
++        <h2 className="text-lg font-semibold">Recent activity</h2>
++        <ActivityFeed />
++      </section>
+     </main>
+   );
+ }
+
+@@ src/features/dashboard/ActivityFeed.tsx @@
++  useEffect(() => {
++    const onScroll = () => {
++      const el = listRef.current;
++      if (!el) return;
++      items.forEach((_, i) => {
++        const node = el.children[i] as HTMLElement;
++        node.style.opacity = node.getBoundingClientRect().top < window.innerHeight ? "1" : "0";
++      });
++    };
++    window.addEventListener("scroll", onScroll);
++    return () => window.removeEventListener("scroll", onScroll);
++  }, [items]);

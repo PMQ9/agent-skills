@@ -14,6 +14,7 @@ description: >-
   not say the word "performance." This skill stays at the implementation level
   ("this call is inefficient") and deliberately avoids architecture or redesign
   advice.
+effort: high
 ---
 
 # Performance PR Reviewer

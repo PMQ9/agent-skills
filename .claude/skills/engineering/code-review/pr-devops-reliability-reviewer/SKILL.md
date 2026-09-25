@@ -15,6 +15,7 @@ description: >-
   than application logic, security, or performance. Fetches the diff via the gh
   CLI, reviews using a fixed DevOps/Operations/Reliability template that names
   the reviewing model, and posts it back to the PR as a comment.
+effort: xhigh
 ---
 
 # DevOps / Operations / Reliability Reviewer

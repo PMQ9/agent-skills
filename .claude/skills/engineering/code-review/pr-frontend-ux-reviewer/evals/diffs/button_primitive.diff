@@ -1,0 +1,89 @@
+@@ src/components/ui/Button.tsx @@
+ const buttonVariants = cva(
+-  "inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
++  "inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:shadow-[0_0_0_2px_#F2CC0C] disabled:pointer-events-none disabled:opacity-50",
+   {
+     variants: {
+-      kind: {
++      variant: {
+         primary: "bg-primary text-primary-foreground hover:bg-primary/90",
+         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+         ghost: "hover:bg-muted hover:text-foreground",
++        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+       },
+       size: {
+         sm: "h-8 px-3 text-xs",
+         md: "h-9 px-4 text-sm",
+         lg: "h-10 px-6 text-sm",
+       },
+     },
+     defaultVariants: {
+-      kind: "primary",
+-      size: "md",
++      variant: "primary",
++      size: "sm",
+     },
+   }
+ );
+
+-export interface ButtonProps
+-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+-    VariantProps<typeof buttonVariants> {}
++export interface ButtonProps
++  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
++    VariantProps<typeof buttonVariants> {
++  loading?: boolean;
++}
+
+-export function Button({ className, kind, size, ...props }: ButtonProps) {
+-  return <button className={cn(buttonVariants({ kind, size }), className)} {...props} />;
++export function Button({ className, variant, size, loading, ...props }: ButtonProps) {
++  return (
++    <button
++      className={cn(buttonVariants({ variant, size }), className)}
++      disabled={props.disabled || loading}
++      {...props}
++    >
++      {loading ? <Spinner size={14} /> : props.children}
++    </button>
++  );
+ }
+
+@@ src/styles/tokens.css @@
+ :root {
+-  --color-primary: #C9A227;
++  --color-primary: #F2CC0C;
+   --color-primary-foreground: #FFFFFF;
+   --color-destructive: #DC2626;
+   --color-destructive-foreground: #FFFFFF;
+   --color-ring: #C9A227;
+
+@@ src/components/ui/Button.stories.tsx @@
++export const AllVariants = () => (
++  <div style={{ display: "flex", gap: 12, background: "#fafafa", padding: 24 }}>
++    {["primary", "secondary", "ghost", "destructive"].map((v, i) => (
++      <Button key={i} variant={v as any}>
++        {v}
++      </Button>
++    ))}
++  </div>
++);
+
+@@ src/features/requests/RequestActions.tsx @@
+-      <Button kind="primary" onClick={submit}>Submit request</Button>
+-      <Button kind="ghost" onClick={cancel}>Cancel</Button>
++      <Button variant="primary" onClick={submit} loading={isSubmitting}>
++        Submit request
++      </Button>
++      <Button variant="ghost" onClick={cancel}>Cancel</Button>
++      <span className="ml-2 flex items-center gap-1 text-xs text-muted-foreground">
++        <img src="/icons/info.svg" className="h-4 w-4" alt="" />
++        Requests are reviewed within 3 business days
++      </span>
+
+@@ package.json @@
+   "devDependencies": {
+     "vite": "^6.0.0",
++    "@axe-core/react": "^4.9.1",
+     "typescript": "^5.7.0"
+   }
